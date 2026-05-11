@@ -1,0 +1,256 @@
+import { CAMP_CELLS, CAMP_SIZE, DIRECTIONS, offsetCellId } from './board'
+import type {
+  CellId,
+  GameState,
+  LegalMove,
+  Piece,
+  PieceId,
+  Player,
+  PlayerId,
+  TurnRecord,
+} from './types'
+
+export const TWO_PLAYER_SETUP: Player[] = [
+  {
+    id: 'north',
+    name: '紅方',
+    homeCamp: 'north',
+    goalCamp: 'south',
+    color: '#d84e45',
+    colorDark: '#982b2c',
+  },
+  {
+    id: 'south',
+    name: '藍方',
+    homeCamp: 'south',
+    goalCamp: 'north',
+    color: '#2f6dd6',
+    colorDark: '#18448f',
+  },
+]
+
+function sortCampForSetup(cellIds: CellId[], playerId: PlayerId): CellId[] {
+  return [...cellIds].sort((a, b) => {
+    const [aqText, arText] = a.split(',')
+    const [bqText, brText] = b.split(',')
+    const aq = Number(aqText)
+    const ar = Number(arText)
+    const bq = Number(bqText)
+    const br = Number(brText)
+
+    if (playerId === 'south') {
+      return br - ar || bq - aq
+    }
+
+    return ar - br || aq - bq
+  })
+}
+
+function createPiecesForPlayer(player: Player): Piece[] {
+  return sortCampForSetup(CAMP_CELLS[player.homeCamp], player.id)
+    .slice(0, CAMP_SIZE)
+    .map((cellIdValue, index) => ({
+      id: `${player.id}-${index + 1}`,
+      playerId: player.id,
+      cellId: cellIdValue,
+    }))
+}
+
+export function createInitialGame(): GameState {
+  return {
+    players: TWO_PLAYER_SETUP,
+    pieces: TWO_PLAYER_SETUP.flatMap(createPiecesForPlayer),
+    currentPlayerId: 'north',
+    turn: 1,
+    winnerId: null,
+    lastMove: null,
+    moveHistory: [],
+  }
+}
+
+export function getPlayer(state: GameState, playerId: PlayerId): Player {
+  const player = state.players.find((candidate) => candidate.id === playerId)
+
+  if (!player) {
+    throw new Error(`Unknown player: ${playerId}`)
+  }
+
+  return player
+}
+
+export function getCurrentPlayer(state: GameState): Player {
+  return getPlayer(state, state.currentPlayerId)
+}
+
+export function getPiece(state: GameState, pieceId: PieceId): Piece | null {
+  return state.pieces.find((piece) => piece.id === pieceId) ?? null
+}
+
+export function getPieceAt(state: GameState, cellIdValue: CellId): Piece | null {
+  return state.pieces.find((piece) => piece.cellId === cellIdValue) ?? null
+}
+
+export function getPiecesForPlayer(state: GameState, playerId: PlayerId): Piece[] {
+  return state.pieces.filter((piece) => piece.playerId === playerId)
+}
+
+function getOccupiedCells(state: GameState): Set<CellId> {
+  return new Set(state.pieces.map((piece) => piece.cellId))
+}
+
+function getNextPlayerId(state: GameState): PlayerId {
+  const currentIndex = state.players.findIndex((player) => player.id === state.currentPlayerId)
+  const nextIndex = (currentIndex + 1) % state.players.length
+
+  return state.players[nextIndex].id
+}
+
+function dedupeJumpMoves(moves: LegalMove[]): LegalMove[] {
+  const shortestByTarget = new Map<CellId, LegalMove>()
+
+  for (const move of moves) {
+    const existing = shortestByTarget.get(move.to)
+
+    if (!existing || move.path.length < existing.path.length) {
+      shortestByTarget.set(move.to, move)
+    }
+  }
+
+  return [...shortestByTarget.values()].sort(
+    (a, b) => a.path.length - b.path.length || a.to.localeCompare(b.to),
+  )
+}
+
+function getJumpMoves(piece: Piece, occupiedWithoutPiece: Set<CellId>): LegalMove[] {
+  const moves: LegalMove[] = []
+  const visited = new Set<CellId>([piece.cellId])
+
+  function walk(fromCellId: CellId, path: CellId[]) {
+    for (const direction of DIRECTIONS) {
+      const middleCellId = offsetCellId(fromCellId, direction)
+      const landingCellId = offsetCellId(fromCellId, direction, 2)
+
+      if (!middleCellId || !landingCellId) {
+        continue
+      }
+
+      if (
+        !occupiedWithoutPiece.has(middleCellId) ||
+        occupiedWithoutPiece.has(landingCellId) ||
+        visited.has(landingCellId)
+      ) {
+        continue
+      }
+
+      const nextPath = [...path, landingCellId]
+      const move: LegalMove = {
+        pieceId: piece.id,
+        from: piece.cellId,
+        to: landingCellId,
+        path: nextPath,
+        kind: 'jump',
+      }
+
+      moves.push(move)
+      visited.add(landingCellId)
+      walk(landingCellId, nextPath)
+      visited.delete(landingCellId)
+    }
+  }
+
+  walk(piece.cellId, [piece.cellId])
+
+  return dedupeJumpMoves(moves)
+}
+
+export function getLegalMovesForPiece(state: GameState, pieceId: PieceId): LegalMove[] {
+  if (state.winnerId) {
+    return []
+  }
+
+  const piece = getPiece(state, pieceId)
+
+  if (!piece || piece.playerId !== state.currentPlayerId) {
+    return []
+  }
+
+  const occupied = getOccupiedCells(state)
+  const stepMoves = DIRECTIONS.flatMap((direction): LegalMove[] => {
+    const to = offsetCellId(piece.cellId, direction)
+
+    if (!to || occupied.has(to)) {
+      return []
+    }
+
+    return [
+      {
+        pieceId: piece.id,
+        from: piece.cellId,
+        to,
+        path: [piece.cellId, to],
+        kind: 'step',
+      },
+    ]
+  })
+
+  const occupiedWithoutPiece = new Set(occupied)
+  occupiedWithoutPiece.delete(piece.cellId)
+
+  return [...stepMoves, ...getJumpMoves(piece, occupiedWithoutPiece)]
+}
+
+export function getLegalMoves(state: GameState): LegalMove[] {
+  return getPiecesForPlayer(state, state.currentPlayerId).flatMap((piece) =>
+    getLegalMovesForPiece(state, piece.id),
+  )
+}
+
+export function findLegalMove(
+  state: GameState,
+  pieceId: PieceId,
+  targetCellId: CellId,
+): LegalMove | null {
+  return getLegalMovesForPiece(state, pieceId).find((move) => move.to === targetCellId) ?? null
+}
+
+export function hasPlayerWon(state: GameState, playerId: PlayerId): boolean {
+  const player = getPlayer(state, playerId)
+  const goalCells = new Set(CAMP_CELLS[player.goalCamp])
+
+  return getPiecesForPlayer(state, playerId).every((piece) => goalCells.has(piece.cellId))
+}
+
+export function applyMove(state: GameState, requestedMove: LegalMove): GameState {
+  const move = findLegalMove(state, requestedMove.pieceId, requestedMove.to)
+
+  if (!move) {
+    throw new Error(`Illegal move for ${requestedMove.pieceId} to ${requestedMove.to}`)
+  }
+
+  const movedPiece = getPiece(state, move.pieceId)
+
+  if (!movedPiece) {
+    throw new Error(`Unknown piece: ${move.pieceId}`)
+  }
+
+  const pieces = state.pieces.map((piece) =>
+    piece.id === move.pieceId ? { ...piece, cellId: move.to } : piece,
+  )
+  const turnRecord: TurnRecord = {
+    ...move,
+    playerId: movedPiece.playerId,
+  }
+  const nextState: GameState = {
+    ...state,
+    pieces,
+    currentPlayerId: getNextPlayerId(state),
+    turn: state.turn + 1,
+    lastMove: turnRecord,
+    moveHistory: [...state.moveHistory, turnRecord],
+  }
+
+  return {
+    ...nextState,
+    winnerId: hasPlayerWon(nextState, movedPiece.playerId) ? movedPiece.playerId : null,
+  }
+}
