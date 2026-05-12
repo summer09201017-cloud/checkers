@@ -1,6 +1,7 @@
-import { GameState } from '../core'
-import { ThemeId, PieceColorSelection, DEFAULT_PIECE_COLORS } from './appearance'
-import { AiDifficulty } from '../core'
+import type { GameState } from '../core'
+import type { ThemeId, PieceColorSelection } from './appearance'
+import { DEFAULT_PIECE_COLORS } from './appearance'
+import type { AiDifficulty } from '../core'
 
 const STORAGE_KEY_GAME = '23d_co_game'
 const STORAGE_KEY_PREFS = '23d_co_prefs'

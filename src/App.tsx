@@ -4,7 +4,6 @@ import { MoveLog } from './app/MoveLog'
 import { VictoryOverlay } from './app/VictoryOverlay'
 import { ChineseCheckersBoard } from './renderers/svg2d/ChineseCheckersBoard'
 import {
-  DEFAULT_PIECE_COLORS,
   PIECE_COLOR_OPTIONS,
   THEME_OPTIONS,
   getPieceColorOption,

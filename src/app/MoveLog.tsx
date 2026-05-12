@@ -1,5 +1,5 @@
 import type { TurnRecord } from '../core'
-import { getPlayer, createInitialGame } from '../core'
+import { createInitialGame } from '../core'
 import './MoveLog.css'
 
 interface MoveLogProps {
@@ -8,7 +8,7 @@ interface MoveLogProps {
   onReplayTo?: (turnIndex: number) => void
 }
 
-export function MoveLog({ moveHistory, gamePlayers, onReplayTo }: MoveLogProps) {
+export function MoveLog({ moveHistory, gamePlayers }: MoveLogProps) {
   function handleExport() {
     const text = moveHistory
       .map((record, index) => {
