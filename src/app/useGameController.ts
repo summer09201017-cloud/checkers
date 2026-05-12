@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import AiWorker from '../core/ai.worker?worker'
 import {
   applyMove,
-  chooseAiMove,
   createInitialGame,
   findLegalMove,
   getCurrentPlayer,
@@ -24,6 +24,15 @@ export function useGameController() {
   const [isOpponentAiEnabled, setIsOpponentAiEnabled] = useState(prefs.isOpponentAiEnabled)
   const [aiDifficulty, setAiDifficulty] = useState<AiDifficulty>(prefs.aiDifficulty)
   const [hintMove, setHintMove] = useState<LegalMove | null>(null)
+  const [isAiThinking, setIsAiThinking] = useState(false)
+  const workerRef = useRef<Worker>(null)
+
+  useEffect(() => {
+    workerRef.current = new AiWorker()
+    return () => {
+      workerRef.current?.terminate()
+    }
+  }, [])
 
   const currentPlayer = useMemo(() => getCurrentPlayer(game), [game])
   const aiPlayer = useMemo(() => getPlayer(game, AI_PLAYER_ID), [game])
@@ -59,34 +68,50 @@ export function useGameController() {
   }, [game.turn, selectedPieceId])
 
   useEffect(() => {
-    if (!isAiTurn) {
+    if (!isAiTurn || !!game.winnerId || !isOpponentAiEnabled) {
       return
     }
 
+    let canceled = false
     const timer = window.setTimeout(() => {
+      if (canceled || !workerRef.current) return
+      
       setSelectedPieceId(null)
-      setGame((currentGame) => {
-        if (
-          currentGame.winnerId ||
-          currentGame.currentPlayerId !== AI_PLAYER_ID ||
-          !isOpponentAiEnabled
-        ) {
-          return currentGame
+      setIsAiThinking(true)
+
+      const handleMessage = (e: MessageEvent) => {
+        if (canceled) return
+        const { move, id } = e.data
+        if (id === 'turn') {
+          setIsAiThinking(false)
+          workerRef.current?.removeEventListener('message', handleMessage)
+          
+          if (!move) return
+          
+          setGame((currentGame) => {
+            if (
+              currentGame.winnerId ||
+              currentGame.currentPlayerId !== AI_PLAYER_ID ||
+              !isOpponentAiEnabled
+            ) {
+              return currentGame
+            }
+            setPastGames((history) => [...history, currentGame])
+            return applyMove(currentGame, move)
+          })
         }
+      }
 
-        const move = chooseAiMove(currentGame, aiDifficulty)
+      workerRef.current.addEventListener('message', handleMessage)
+      workerRef.current.postMessage({ state: game, difficulty: aiDifficulty, id: 'turn' })
+    }, 250)
 
-        if (!move) {
-          return currentGame
-        }
-
-        setPastGames((history) => [...history, currentGame])
-        return applyMove(currentGame, move)
-      })
-    }, 550)
-
-    return () => window.clearTimeout(timer)
-  }, [aiDifficulty, isAiTurn, isOpponentAiEnabled])
+    return () => {
+      canceled = true
+      window.clearTimeout(timer)
+      setIsAiThinking(false)
+    }
+  }, [game, aiDifficulty, isAiTurn, isOpponentAiEnabled])
 
   function selectCell(cellId: CellId) {
     if (game.winnerId || isAiTurn) {
@@ -141,9 +166,19 @@ export function useGameController() {
   }
 
   function showHint() {
-    if (game.winnerId || isAiTurn) return
-    const move = chooseAiMove(game, 'hard')
-    setHintMove(move)
+    if (game.winnerId || isAiTurn || !workerRef.current || isAiThinking) return
+    
+    setIsAiThinking(true)
+    const handleMessage = (e: MessageEvent) => {
+      const { move, id } = e.data
+      if (id === 'hint') {
+        setIsAiThinking(false)
+        workerRef.current?.removeEventListener('message', handleMessage)
+        setHintMove(move)
+      }
+    }
+    workerRef.current.addEventListener('message', handleMessage)
+    workerRef.current.postMessage({ state: game, difficulty: 'hard', id: 'hint' })
   }
 
   return {
@@ -153,6 +188,7 @@ export function useGameController() {
     aiPlayer,
     winner,
     isAiTurn,
+    isAiThinking,
     isOpponentAiEnabled,
     selectedPiece,
     selectedPieceId,

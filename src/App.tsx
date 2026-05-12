@@ -30,6 +30,7 @@ function App() {
     aiPlayer,
     winner,
     isAiTurn,
+    isAiThinking,
     isOpponentAiEnabled,
     selectedPiece,
     selectedPieceId,
@@ -107,7 +108,7 @@ function App() {
           <ChineseCheckersBoard
             game={game}
             selectedPieceId={selectedPieceId}
-            isInteractionDisabled={isAiTurn}
+            isInteractionDisabled={isAiTurn || isAiThinking}
             pieceStyles={pieceStyles}
             legalMoves={legalMoves}
             hintMove={hintMove}
@@ -253,13 +254,13 @@ function App() {
           <section className="panel-section">
             <h2>操作</h2>
             <div className="button-row">
-              <button type="button" onClick={showHint} disabled={isAiTurn || !!winner}>
-                提示
+              <button type="button" onClick={showHint} disabled={isAiTurn || !!winner || isAiThinking}>
+                {isAiThinking ? '思考中...' : '提示'}
               </button>
-              <button type="button" onClick={undo} disabled={!canUndo}>
+              <button type="button" onClick={undo} disabled={!canUndo || isAiThinking}>
                 悔棋
               </button>
-              <button type="button" onClick={restart}>
+              <button type="button" onClick={restart} disabled={isAiThinking}>
                 重新開始
               </button>
             </div>
