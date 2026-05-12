@@ -329,6 +329,8 @@ button:disabled {
   .app-header {
     align-items: stretch;
     flex-direction: column;
+    padding: 16px;
+    gap: 16px;
   }
 
   .turn-badge {
@@ -337,10 +339,38 @@ button:disabled {
 
   .game-layout {
     grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .board-stage {
+    flex: 1;
+    padding: 10px;
+    align-items: flex-start;
   }
 
   .side-panel {
     border-top: 1px solid var(--panel-border);
     border-left: 0;
+    padding: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+    max-height: 45vh;
+    overflow-y: auto;
+    background: var(--surface);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.05);
+  }
+  
+  .panel-section + .panel-section {
+    margin-top: 0;
+    padding-top: 24px;
   }
 }
+
+@media (max-width: 480px) {
+  .side-panel {
+    grid-template-columns: 1fr;
+  }
+}
+

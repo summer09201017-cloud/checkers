@@ -11,15 +11,19 @@ import {
   getPlayer,
 } from '../core'
 import type { AiDifficulty, CellId, GameState, LegalMove, PieceId, PlayerId } from '../core'
+import { soundManager } from './sound'
+import { saveGameState, loadGameState, clearGameState, loadPreferences } from './storage'
 
 const AI_PLAYER_ID: PlayerId = 'south'
 
 export function useGameController() {
-  const [game, setGame] = useState<GameState>(() => createInitialGame())
+  const prefs = useMemo(() => loadPreferences(), [])
+  const [game, setGame] = useState<GameState>(() => loadGameState() || createInitialGame())
   const [selectedPieceId, setSelectedPieceId] = useState<PieceId | null>(null)
   const [pastGames, setPastGames] = useState<GameState[]>([])
-  const [isOpponentAiEnabled, setIsOpponentAiEnabled] = useState(true)
-  const [aiDifficulty, setAiDifficulty] = useState<AiDifficulty>('normal')
+  const [isOpponentAiEnabled, setIsOpponentAiEnabled] = useState(prefs.isOpponentAiEnabled)
+  const [aiDifficulty, setAiDifficulty] = useState<AiDifficulty>(prefs.aiDifficulty)
+  const [hintMove, setHintMove] = useState<LegalMove | null>(null)
 
   const currentPlayer = useMemo(() => getCurrentPlayer(game), [game])
   const aiPlayer = useMemo(() => getPlayer(game, AI_PLAYER_ID), [game])
@@ -33,6 +37,26 @@ export function useGameController() {
     [game, selectedPieceId],
   )
   const isAiTurn = isOpponentAiEnabled && game.currentPlayerId === AI_PLAYER_ID && !game.winnerId
+
+  useEffect(() => {
+    if (game.winnerId) {
+      soundManager.play('win')
+    } else if (game.lastMove) {
+      if (game.lastMove.kind === 'jump' && game.lastMove.path.length > 2) {
+        soundManager.play('chainJump')
+      } else {
+        soundManager.play(game.lastMove.kind)
+      }
+    }
+  }, [game.lastMove, game.winnerId])
+
+  useEffect(() => {
+    saveGameState(game)
+  }, [game])
+
+  useEffect(() => {
+    setHintMove(null)
+  }, [game.turn, selectedPieceId])
 
   useEffect(() => {
     if (!isAiTurn) {
@@ -72,6 +96,7 @@ export function useGameController() {
     const clickedPiece = getPieceAt(game, cellId)
 
     if (clickedPiece?.playerId === game.currentPlayerId) {
+      soundManager.play('select')
       setSelectedPieceId(clickedPiece.id)
       return
     }
@@ -91,9 +116,11 @@ export function useGameController() {
   }
 
   function restart() {
-    setGame(createInitialGame())
+    const newGame = createInitialGame()
+    setGame(newGame)
     setPastGames([])
     setSelectedPieceId(null)
+    clearGameState()
   }
 
   function undo() {
@@ -106,10 +133,17 @@ export function useGameController() {
         return history
       }
 
+      soundManager.play('undo')
       setGame(previousGame)
       setSelectedPieceId(null)
       return history.slice(0, -undoStepCount)
     })
+  }
+
+  function showHint() {
+    if (game.winnerId || isAiTurn) return
+    const move = chooseAiMove(game, 'hard')
+    setHintMove(move)
   }
 
   return {
@@ -123,11 +157,13 @@ export function useGameController() {
     selectedPiece,
     selectedPieceId,
     legalMoves,
+    hintMove,
     canUndo: pastGames.length > 0,
     selectCell,
     setAiDifficulty,
     setIsOpponentAiEnabled,
     restart,
     undo,
+    showHint,
   }
 }

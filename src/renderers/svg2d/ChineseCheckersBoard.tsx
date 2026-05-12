@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BOARD_CELLS, CELL_BY_ID, getPlayer } from '../../core'
 import type { BoardCell, CellId, GameState, LegalMove, Piece, PlayerId } from '../../core'
 import type { CSSProperties, KeyboardEvent } from 'react'
@@ -16,6 +16,7 @@ interface ChineseCheckersBoardProps {
   isInteractionDisabled?: boolean
   pieceStyles: Record<PlayerId, PieceVisualStyle>
   legalMoves: LegalMove[]
+  hintMove?: LegalMove | null
   onCellSelect: (cellId: CellId) => void
 }
 
@@ -83,8 +84,11 @@ export function ChineseCheckersBoard({
   isInteractionDisabled = false,
   pieceStyles,
   legalMoves,
+  hintMove,
   onCellSelect,
 }: ChineseCheckersBoardProps) {
+  const [animation, setAnimation] = useState<{ pieceId: string; turn: number; currentPos: { x: number; y: number } } | null>(null)
+  
   const layout = useMemo(() => createLayout(), [])
   const piecesByCell = useMemo(
     () => new Map<CellId, Piece>(game.pieces.map((piece) => [piece.cellId, piece])),
@@ -97,8 +101,60 @@ export function ChineseCheckersBoard({
   const lastMovePath = game.lastMove?.path ?? []
   const lastMoveCells = new Set(lastMovePath)
 
+  useEffect(() => {
+    if (game.lastMove && game.lastMove.path.length > 1) {
+      let canceled = false
+      const pathCells = game.lastMove.path.map((id) => {
+        const cell = CELL_BY_ID.get(id)
+        return cell ? cellToPoint(cell) : { x: 0, y: 0 }
+      })
+
+      const startTime = performance.now()
+      const durationPerStep = 250 // ms
+      const totalDuration = (pathCells.length - 1) * durationPerStep
+
+      setAnimation({ pieceId: game.lastMove.pieceId, turn: game.turn, currentPos: pathCells[0] })
+
+      function step(now: number) {
+        if (canceled) return
+        const elapsed = now - startTime
+        if (elapsed >= totalDuration) {
+          setAnimation(null)
+          return
+        }
+
+        const stepIndex = Math.floor(elapsed / durationPerStep)
+        const stepProgress = (elapsed % durationPerStep) / durationPerStep
+        
+        const start = pathCells[stepIndex]
+        const end = pathCells[stepIndex + 1]
+        
+        // Easing for X and Y linear movement
+        // Add a vertical hop effect (sine wave)
+        const hopHeight = 16
+        const hopY = Math.sin(stepProgress * Math.PI) * hopHeight
+
+        const currentPos = {
+          x: start.x + (end.x - start.x) * stepProgress,
+          y: start.y + (end.y - start.y) * stepProgress - hopY,
+        }
+
+        setAnimation({ pieceId: game.lastMove!.pieceId, turn: game.turn, currentPos })
+        requestAnimationFrame(step)
+      }
+
+      requestAnimationFrame(step)
+      return () => {
+        canceled = true
+        setAnimation(null)
+      }
+    }
+  }, [game.lastMove, game.turn])
+
+  const effectivelyDisabled = isInteractionDisabled || animation !== null
+
   function handleKeyDown(event: KeyboardEvent<SVGGElement>, cellId: CellId) {
-    if (isInteractionDisabled) {
+    if (effectivelyDisabled) {
       return
     }
 
@@ -110,7 +166,7 @@ export function ChineseCheckersBoard({
 
   return (
     <svg
-      className={`checker-board${isInteractionDisabled ? ' is-interaction-disabled' : ''}`}
+      className={`checker-board${effectivelyDisabled ? ' is-interaction-disabled' : ''}`}
       viewBox={layout.viewBox}
       role="img"
       aria-label="中國跳棋棋盤"
@@ -127,6 +183,13 @@ export function ChineseCheckersBoard({
             points={pathPoints(move.path)}
           />
         ))}
+
+      {hintMove && (
+        <polyline
+          className="move-path hint-move-path"
+          points={pathPoints(hintMove.path)}
+        />
+      )}
 
       <g className="board-cells">
         {layout.cells.map(({ cell, x, y }) => {
@@ -149,16 +212,17 @@ export function ChineseCheckersBoard({
               data-testid={`cell-${cell.id}`}
               role="button"
               tabIndex={0}
-              aria-disabled={isInteractionDisabled}
+              aria-disabled={effectivelyDisabled}
               aria-label={`棋格 ${cell.id}`}
               onClick={() => {
-                if (!isInteractionDisabled) {
+                if (!effectivelyDisabled) {
                   onCellSelect(cell.id)
                 }
               }}
               onKeyDown={(event) => handleKeyDown(event, cell.id)}
             >
-              <circle cx={x} cy={y} r="11" />
+              <circle className="touch-area" cx={x} cy={y} r="22" fill="transparent" />
+              <circle className="cell-visual" cx={x} cy={y} r="11" />
               {isLegalTarget && <circle className="target-ring" cx={x} cy={y} r="18" />}
             </g>
           )
@@ -175,37 +239,43 @@ export function ChineseCheckersBoard({
 
           const isSelected = piece.id === selectedPieceId
           const isCurrentTurn = piece.playerId === game.currentPlayerId
+          const isAnimating = animation && animation.pieceId === piece.id && animation.turn === game.turn
           const className = [
             'piece',
             isSelected ? 'is-selected' : '',
             isCurrentTurn ? 'is-current-turn' : '',
+            isAnimating ? 'is-animating' : '',
           ]
             .filter(Boolean)
             .join(' ')
+            
+          const renderX = isAnimating ? animation.currentPos.x : x
+          const renderY = isAnimating ? animation.currentPos.y : y
 
           return (
             <g
               key={piece.id}
               className={className}
-              style={getPieceStyle(piece, pieceStyles)}
+              style={{ ...getPieceStyle(piece, pieceStyles), transform: `translate(${renderX}px, ${renderY}px)` }}
               data-piece-id={piece.id}
               data-testid={`piece-${piece.id}`}
               role="button"
               tabIndex={0}
-              aria-disabled={isInteractionDisabled}
+              aria-disabled={effectivelyDisabled}
               aria-label={`${getPlayer(game, piece.playerId).name}棋子`}
               onClick={() => {
-                if (!isInteractionDisabled) {
+                if (!effectivelyDisabled) {
                   onCellSelect(cell.id)
                 }
               }}
               onKeyDown={(event) => handleKeyDown(event, cell.id)}
             >
-              <ellipse className="piece-shadow" cx={x + 2} cy={y + 5} rx="17" ry="8" />
-              <circle className="piece-rim" cx={x} cy={y} r="18" />
-              <circle className="piece-body" cx={x} cy={y} r="17" />
-              <circle className="piece-glow" cx={x - 4} cy={y - 5} r="10" />
-              <circle className="piece-highlight" cx={x - 6} cy={y - 7} r="4.5" />
+              <circle className="touch-area" cx={renderX} cy={renderY} r="22" fill="transparent" />
+              <ellipse className="piece-shadow" cx={2} cy={5} rx="17" ry="8" />
+              <circle className="piece-rim" cx={0} cy={0} r="18" />
+              <circle className="piece-body" cx={0} cy={0} r="17" />
+              <circle className="piece-glow" cx={-4} cy={-5} r="10" />
+              <circle className="piece-highlight" cx={-6} cy={-7} r="4.5" />
             </g>
           )
         })}

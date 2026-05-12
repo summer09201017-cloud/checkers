@@ -1,5 +1,7 @@
 import { AI_DIFFICULTY_OPTIONS, BOARD_CELLS } from './core'
 import { useGameController } from './app/useGameController'
+import { MoveLog } from './app/MoveLog'
+import { VictoryOverlay } from './app/VictoryOverlay'
 import { ChineseCheckersBoard } from './renderers/svg2d/ChineseCheckersBoard'
 import {
   DEFAULT_PIECE_COLORS,
@@ -7,16 +9,21 @@ import {
   THEME_OPTIONS,
   getPieceColorOption,
 } from './app/appearance'
+import { loadPreferences, savePreferences } from './app/storage'
+import { soundManager } from './app/sound'
 import type { PieceVisualStyle } from './renderers/svg2d/ChineseCheckersBoard'
 import type { AiDifficulty, PlayerId } from './core'
 import type { PieceColorId, ThemeId } from './app/appearance'
 import type { CSSProperties, ChangeEvent } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 function App() {
-  const [themeId, setThemeId] = useState<ThemeId>('classic')
-  const [pieceColorSelection, setPieceColorSelection] = useState(DEFAULT_PIECE_COLORS)
+  const prefs = useMemo(() => loadPreferences(), [])
+  const [themeId, setThemeId] = useState<ThemeId>(prefs.themeId)
+  const [pieceColorSelection, setPieceColorSelection] = useState(prefs.pieceColorSelection)
+  const [isMuted, setIsMuted] = useState(soundManager.getMuted())
+  const [isBgmPlaying, setIsBgmPlaying] = useState(soundManager.getBgmPlaying())
   const {
     game,
     currentPlayer,
@@ -28,13 +35,24 @@ function App() {
     selectedPiece,
     selectedPieceId,
     legalMoves,
+    hintMove,
     canUndo,
     selectCell,
     setAiDifficulty,
     setIsOpponentAiEnabled,
     restart,
     undo,
+    showHint,
   } = useGameController()
+
+  useEffect(() => {
+    savePreferences({
+      themeId,
+      pieceColorSelection,
+      isOpponentAiEnabled,
+      aiDifficulty,
+    })
+  }, [themeId, pieceColorSelection, isOpponentAiEnabled, aiDifficulty])
 
   const aiDifficultyLabel =
     AI_DIFFICULTY_OPTIONS.find((option) => option.value === aiDifficulty)?.label ?? '普通'
@@ -65,6 +83,14 @@ function App() {
     }))
   }
 
+  function handleToggleMute() {
+    setIsMuted(soundManager.toggleMute())
+  }
+
+  function handleToggleBgm() {
+    setIsBgmPlaying(soundManager.toggleBgm())
+  }
+
   return (
     <main className="app-shell" data-theme={themeId}>
       <header className="app-header">
@@ -85,6 +111,7 @@ function App() {
             isInteractionDisabled={isAiTurn}
             pieceStyles={pieceStyles}
             legalMoves={legalMoves}
+            hintMove={hintMove}
             onCellSelect={selectCell}
           />
         </div>
@@ -118,6 +145,10 @@ function App() {
                 <dd>{THEME_OPTIONS.find((option) => option.id === themeId)?.label}</dd>
               </div>
             </dl>
+          </section>
+
+          <section className="panel-section">
+            <MoveLog moveHistory={game.moveHistory} gamePlayers={game.players} />
           </section>
 
           <section className="panel-section">
@@ -201,8 +232,31 @@ function App() {
           </section>
 
           <section className="panel-section">
+            <h2>聲音</h2>
+            <label className="checkbox-control">
+              <input
+                type="checkbox"
+                checked={!isMuted}
+                onChange={handleToggleMute}
+              />
+              <span>音效</span>
+            </label>
+            <label className="checkbox-control">
+              <input
+                type="checkbox"
+                checked={isBgmPlaying}
+                onChange={handleToggleBgm}
+              />
+              <span>背景音樂</span>
+            </label>
+          </section>
+
+          <section className="panel-section">
             <h2>操作</h2>
             <div className="button-row">
+              <button type="button" onClick={showHint} disabled={isAiTurn || !!winner}>
+                提示
+              </button>
               <button type="button" onClick={undo} disabled={!canUndo}>
                 悔棋
               </button>
@@ -222,6 +276,8 @@ function App() {
           </section>
         </aside>
       </section>
+
+      <VictoryOverlay winner={winner} turn={game.turn} onRestart={restart} />
     </main>
   )
 }

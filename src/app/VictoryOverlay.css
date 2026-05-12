@@ -1,0 +1,98 @@
+.victory-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(17, 24, 39, 0.4);
+  backdrop-filter: blur(4px);
+  animation: overlay-fade-in 0.5s ease-out;
+}
+
+.victory-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.victory-content {
+  position: relative;
+  z-index: 10;
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 40px 60px;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  border: 4px solid var(--winner-color);
+  animation: pop-in 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.victory-badge {
+  font-size: 64px;
+  line-height: 1;
+  margin-bottom: 16px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+}
+
+.victory-content h2 {
+  font-size: 36px;
+  margin: 0 0 16px;
+  color: var(--winner-color);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.victory-stats {
+  font-size: 18px;
+  color: var(--text);
+  margin-bottom: 32px;
+}
+
+.victory-stats span {
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.victory-button {
+  font-size: 20px;
+  padding: 16px 32px;
+  border-radius: 999px;
+  background: var(--winner-color);
+  color: white;
+  border: none;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--winner-color) 40%, transparent);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.victory-button:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--winner-color) 60%, transparent);
+}
+
+.victory-button:active {
+  transform: translateY(1px) scale(0.95);
+}
+
+@keyframes overlay-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}

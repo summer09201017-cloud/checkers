@@ -20,7 +20,7 @@
   outline: none;
 }
 
-.board-cell circle:first-child {
+.board-cell .cell-visual {
   fill: var(--cell-center);
   stroke: var(--cell-center-stroke);
   stroke-width: 1.5;
@@ -29,31 +29,31 @@
     stroke 140ms ease;
 }
 
-.board-cell:hover circle:first-child,
-.board-cell:focus-visible circle:first-child {
+.board-cell:hover .cell-visual,
+.board-cell:focus-visible .cell-visual {
   fill: var(--cell-hover);
   stroke: #72839a;
 }
 
-.camp-north circle:first-child,
-.camp-south circle:first-child {
+.camp-north .cell-visual,
+.camp-south .cell-visual {
   fill: var(--camp-red);
   stroke: var(--camp-red-stroke);
 }
 
-.camp-northEast circle:first-child,
-.camp-southWest circle:first-child {
+.camp-northEast .cell-visual,
+.camp-southWest .cell-visual {
   fill: var(--camp-green);
   stroke: var(--camp-green-stroke);
 }
 
-.camp-southEast circle:first-child,
-.camp-northWest circle:first-child {
+.camp-southEast .cell-visual,
+.camp-northWest .cell-visual {
   fill: var(--camp-violet);
   stroke: var(--camp-violet-stroke);
 }
 
-.board-cell.is-last-move-cell circle:first-child {
+.board-cell.is-last-move-cell .cell-visual {
   fill: #fff1b8;
   stroke: var(--move-last);
 }
@@ -84,9 +84,27 @@
   stroke-width: 6;
 }
 
+.hint-move-path {
+  stroke: color-mix(in srgb, var(--move-target) 60%, transparent);
+  stroke-width: 8;
+  stroke-dasharray: 12 12;
+  animation: hint-dash 1s linear infinite;
+}
+
+@keyframes hint-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
 .piece {
   cursor: pointer;
   outline: none;
+  transition: transform 0.2s ease;
+}
+
+.piece.is-animating {
+  transition: none;
 }
 
 .piece-shadow {
