@@ -10,11 +10,24 @@ import {
   getPieceAt,
   getPlayer,
 } from '../core'
-import type { AiDifficulty, CellId, GameState, LegalMove, PieceId, PlayerId } from '../core'
+import type { AiDifficulty, CellId, GameState, LegalMove, PieceId, PlayerId, TurnRecord } from '../core'
 import { soundManager } from './sound'
 import { saveGameState, loadGameState, clearGameState, loadPreferences } from './storage'
 
 const AI_PLAYER_ID: PlayerId = 'south'
+
+// Rebuild the board as it stood after `moveCount` moves by replaying recorded
+// moves from the initial position. moveHistory is engine-produced, so every
+// replayed move is legal at its step.
+function reconstructGameAt(history: TurnRecord[], moveCount: number): GameState {
+  let state = createInitialGame()
+
+  for (let index = 0; index < moveCount; index += 1) {
+    state = applyMove(state, history[index])
+  }
+
+  return state
+}
 
 export function useGameController() {
   const prefs = useMemo(() => loadPreferences(), [])
@@ -25,6 +38,8 @@ export function useGameController() {
   const [aiDifficulty, setAiDifficulty] = useState<AiDifficulty>(prefs.aiDifficulty)
   const [hintMove, setHintMove] = useState<LegalMove | null>(null)
   const [isAiThinking, setIsAiThinking] = useState(false)
+  // Index into moveHistory currently being reviewed; null = following live play.
+  const [replayIndex, setReplayIndex] = useState<number | null>(null)
   const workerRef = useRef<Worker>(null)
 
   useEffect(() => {
@@ -44,6 +59,12 @@ export function useGameController() {
   const legalMoves = useMemo<LegalMove[]>(
     () => (selectedPieceId ? getLegalMovesForPiece(game, selectedPieceId) : []),
     [game, selectedPieceId],
+  )
+  const isReplaying = replayIndex !== null
+  // The board displays this; all game logic (AI, sound, save) still uses `game`.
+  const viewedGame = useMemo(
+    () => (replayIndex === null ? game : reconstructGameAt(game.moveHistory, replayIndex + 1)),
+    [game, replayIndex],
   )
   const isAiTurn =
     isOpponentAiEnabled &&
@@ -118,7 +139,7 @@ export function useGameController() {
   }, [game, aiDifficulty, isAiTurn, isOpponentAiEnabled])
 
   function selectCell(cellId: CellId) {
-    if (game.winnerId || game.isDraw || isAiTurn) {
+    if (game.winnerId || game.isDraw || isAiTurn || isReplaying) {
       return
     }
 
@@ -149,7 +170,19 @@ export function useGameController() {
     setGame(newGame)
     setPastGames([])
     setSelectedPieceId(null)
+    setReplayIndex(null)
     clearGameState()
+  }
+
+  // Review the position after move `index`. Clicking the latest move (or beyond)
+  // snaps back to live play.
+  function replayTo(index: number) {
+    setReplayIndex(index >= game.moveHistory.length - 1 ? null : index)
+    setSelectedPieceId(null)
+  }
+
+  function exitReplay() {
+    setReplayIndex(null)
   }
 
   function undo() {
@@ -165,6 +198,7 @@ export function useGameController() {
       soundManager.play('undo')
       setGame(previousGame)
       setSelectedPieceId(null)
+      setReplayIndex(null)
       return history.slice(0, -undoStepCount)
     })
   }
@@ -187,6 +221,9 @@ export function useGameController() {
 
   return {
     game,
+    viewedGame,
+    isReplaying,
+    replayIndex,
     currentPlayer,
     aiDifficulty,
     aiPlayer,
@@ -205,5 +242,7 @@ export function useGameController() {
     restart,
     undo,
     showHint,
+    replayTo,
+    exitReplay,
   }
 }

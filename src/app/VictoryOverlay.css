@@ -30,6 +30,26 @@
   animation: pop-in 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
+.victory-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px 9px;
+  border-radius: 8px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.victory-close:hover {
+  color: var(--text-strong);
+  background: rgba(0, 0, 0, 0.06);
+}
+
 .victory-badge {
   font-size: 64px;
   line-height: 1;

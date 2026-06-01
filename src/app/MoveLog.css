@@ -72,6 +72,35 @@
   border-bottom: none;
 }
 
+.move-log-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.replay-exit {
+  width: auto;
+  min-width: unset;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--move-target);
+}
+
+.move-item.is-clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.move-item.is-clickable:hover {
+  background: color-mix(in srgb, var(--panel-border) 30%, transparent);
+}
+
+.move-item.is-active {
+  background: color-mix(in srgb, var(--move-target) 18%, transparent);
+  box-shadow: inset 3px 0 0 var(--move-target);
+}
+
 .move-num {
   color: var(--muted);
   min-width: 24px;

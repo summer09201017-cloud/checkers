@@ -4,11 +4,13 @@ import './VictoryOverlay.css'
 
 interface VictoryOverlayProps {
   winner: Player | null
+  isDraw?: boolean
   turn: number
   onRestart: () => void
+  onClose?: () => void
 }
 
-export function VictoryOverlay({ winner, turn, onRestart }: VictoryOverlayProps) {
+export function VictoryOverlay({ winner, isDraw = false, turn, onRestart, onClose }: VictoryOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -84,16 +86,28 @@ export function VictoryOverlay({ winner, turn, onRestart }: VictoryOverlayProps)
     }
   }, [winner])
 
-  if (!winner) return null
+  if (!winner && !isDraw) return null
+
+  // A draw has no champion, so use a neutral accent instead of a player colour.
+  const accentColor = winner ? winner.color : '#6b7280'
 
   return (
     <div className="victory-overlay">
-      <canvas ref={canvasRef} className="victory-canvas" />
-      <div className="victory-content" style={{ '--winner-color': winner.color } as React.CSSProperties}>
-        <div className="victory-badge">🏆</div>
-        <h2>{winner.name} 獲勝！</h2>
+      {winner && <canvas ref={canvasRef} className="victory-canvas" />}
+      <div className="victory-content" style={{ '--winner-color': accentColor } as React.CSSProperties}>
+        {onClose && (
+          <button className="victory-close" onClick={onClose} aria-label="關閉，回顧棋盤與棋譜" title="關閉，回顧棋盤與棋譜">
+            ✕
+          </button>
+        )}
+        <div className="victory-badge">{winner ? '🏆' : '🤝'}</div>
+        <h2>{winner ? `${winner.name} 獲勝！` : '和局！'}</h2>
         <div className="victory-stats">
-          <p>總計手數：<span>{turn} 手</span></p>
+          {winner ? (
+            <p>總計手數：<span>{turn} 手</span></p>
+          ) : (
+            <p>雙方僵持，已達步數上限 · <span>{turn} 手</span></p>
+          )}
         </div>
         <button className="victory-button" onClick={onRestart}>
           再來一局

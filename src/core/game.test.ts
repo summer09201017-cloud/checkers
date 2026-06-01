@@ -168,3 +168,33 @@ describe('遊戲一定會結束（終止性）', () => {
     }
   })
 })
+
+describe('棋譜回放的基礎：重放 moveHistory 能重現盤面', () => {
+  it('重放全部記錄可完整重現最終盤面', () => {
+    const final = playSelfGame('hard', mulberry32(1))
+
+    let replayed = createInitialGame()
+    for (const record of final.moveHistory) {
+      replayed = applyMove(replayed, record)
+    }
+
+    expect(replayed.turn).toBe(final.turn)
+    expect(replayed.winnerId).toBe(final.winnerId)
+    expect(replayed.isDraw).toBe(final.isDraw)
+    expect(replayed.pieces).toEqual(final.pieces)
+  })
+
+  it('重放前半段可重現中途盤面（尚未分出勝負）', () => {
+    const final = playSelfGame('hard', mulberry32(1))
+    const half = Math.floor(final.moveHistory.length / 2)
+
+    let mid = createInitialGame()
+    for (let index = 0; index < half; index += 1) {
+      mid = applyMove(mid, final.moveHistory[index])
+    }
+
+    expect(mid.moveHistory).toHaveLength(half)
+    expect(mid.winnerId).toBeNull()
+    expect(mid.lastMove).toEqual(final.moveHistory[half - 1])
+  })
+})

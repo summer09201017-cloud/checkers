@@ -23,8 +23,12 @@ function App() {
   const [pieceColorSelection, setPieceColorSelection] = useState(prefs.pieceColorSelection)
   const [isMuted, setIsMuted] = useState(soundManager.getMuted())
   const [isBgmPlaying, setIsBgmPlaying] = useState(soundManager.getBgmPlaying())
+  const [isOverlayDismissed, setIsOverlayDismissed] = useState(false)
   const {
     game,
+    viewedGame,
+    isReplaying,
+    replayIndex,
     currentPlayer,
     aiDifficulty,
     aiPlayer,
@@ -43,6 +47,8 @@ function App() {
     restart,
     undo,
     showHint,
+    replayTo,
+    exitReplay,
   } = useGameController()
 
   useEffect(() => {
@@ -53,6 +59,18 @@ function App() {
       aiDifficulty,
     })
   }, [themeId, pieceColorSelection, isOpponentAiEnabled, aiDifficulty])
+
+  // Restart/undo are the only exits from a finished game, so resetting the
+  // dismissed flag here guarantees the overlay reappears for the next result.
+  function handleRestart() {
+    setIsOverlayDismissed(false)
+    restart()
+  }
+
+  function handleUndo() {
+    setIsOverlayDismissed(false)
+    undo()
+  }
 
   const aiDifficultyLabel =
     AI_DIFFICULTY_OPTIONS.find((option) => option.value === aiDifficulty)?.label ?? '普通'
@@ -108,12 +126,12 @@ function App() {
       <section className="game-layout">
         <div className="board-stage">
           <ChineseCheckersBoard
-            game={game}
-            selectedPieceId={selectedPieceId}
-            isInteractionDisabled={isAiTurn || isAiThinking}
+            game={viewedGame}
+            selectedPieceId={isReplaying ? null : selectedPieceId}
+            isInteractionDisabled={isAiTurn || isAiThinking || isReplaying}
             pieceStyles={pieceStyles}
-            legalMoves={legalMoves}
-            hintMove={hintMove}
+            legalMoves={isReplaying ? [] : legalMoves}
+            hintMove={isReplaying ? null : hintMove}
             onCellSelect={selectCell}
           />
         </div>
@@ -150,7 +168,13 @@ function App() {
           </section>
 
           <section className="panel-section">
-            <MoveLog moveHistory={game.moveHistory} gamePlayers={game.players} />
+            <MoveLog
+              moveHistory={game.moveHistory}
+              gamePlayers={game.players}
+              onReplayTo={replayTo}
+              activeIndex={replayIndex}
+              onExitReplay={exitReplay}
+            />
           </section>
 
           <section className="panel-section">
@@ -259,10 +283,10 @@ function App() {
               <button type="button" onClick={showHint} disabled={isAiTurn || !!winner || game.isDraw || isAiThinking}>
                 {isAiThinking ? '思考中...' : '提示'}
               </button>
-              <button type="button" onClick={undo} disabled={!canUndo || isAiThinking}>
+              <button type="button" onClick={handleUndo} disabled={!canUndo || isAiThinking}>
                 悔棋
               </button>
-              <button type="button" onClick={restart} disabled={isAiThinking}>
+              <button type="button" onClick={handleRestart} disabled={isAiThinking}>
                 重新開始
               </button>
             </div>
@@ -279,7 +303,15 @@ function App() {
         </aside>
       </section>
 
-      <VictoryOverlay winner={winner} turn={game.turn} onRestart={restart} />
+      {!isOverlayDismissed && (
+        <VictoryOverlay
+          winner={winner}
+          isDraw={game.isDraw}
+          turn={game.turn}
+          onRestart={handleRestart}
+          onClose={() => setIsOverlayDismissed(true)}
+        />
+      )}
     </main>
   )
 }
