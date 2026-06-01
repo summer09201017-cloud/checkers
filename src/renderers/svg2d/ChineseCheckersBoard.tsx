@@ -123,13 +123,17 @@ export function ChineseCheckersBoard({
           return
         }
 
-        const stepIndex = Math.floor(elapsed / durationPerStep)
-        const stepProgress = (elapsed % durationPerStep) / durationPerStep
-        
+        // Clamp into a valid segment. A rAF timestamp can land slightly before
+        // startTime (negative elapsed) or overshoot, which would make the index
+        // out of range; pathCells[badIndex] is undefined and reading .x throws,
+        // killing the loop and leaving the board stuck "mid-animation".
+        const maxIndex = pathCells.length - 2
+        const stepIndex = Math.max(0, Math.min(Math.floor(elapsed / durationPerStep), maxIndex))
+        const stepProgress = Math.max(0, Math.min(1, (elapsed - stepIndex * durationPerStep) / durationPerStep))
+
         const start = pathCells[stepIndex]
         const end = pathCells[stepIndex + 1]
-        
-        // Easing for X and Y linear movement
+
         // Add a vertical hop effect (sine wave)
         const hopHeight = 16
         const hopY = Math.sin(stepProgress * Math.PI) * hopHeight
