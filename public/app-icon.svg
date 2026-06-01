@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="36%" r="80%">
+      <stop offset="0%" stop-color="#28365c"/>
+      <stop offset="100%" stop-color="#0f1626"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g fill="none" stroke="#ecdfb0" stroke-width="9" stroke-linejoin="round" opacity="0.85">
+    <polygon points="256,98 393,335 119,335"/>
+    <polygon points="256,414 119,177 393,177"/>
+  </g>
+  <g stroke="#0f1626" stroke-width="3">
+    <circle cx="256" cy="98"  r="29" fill="#d84e45"/>
+    <circle cx="393" cy="177" r="29" fill="#2f6dd6"/>
+    <circle cx="393" cy="335" r="29" fill="#d84e45"/>
+    <circle cx="256" cy="414" r="29" fill="#2f6dd6"/>
+    <circle cx="119" cy="335" r="29" fill="#d84e45"/>
+    <circle cx="119" cy="177" r="29" fill="#2f6dd6"/>
+    <circle cx="256" cy="256" r="25" fill="#ecdfb0"/>
+  </g>
+</svg>
