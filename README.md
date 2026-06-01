@@ -12,6 +12,22 @@ npm run lint
 npm run build
 ```
 
+### 自動試玩（瀏覽器端測試）
+
+`npm run test` 只測純規則引擎（`src/core/`），測不到畫面 / 動畫 / Web Worker 的當機與凍結。
+`npm run playtest` 會用無頭瀏覽器**真的把遊戲玩起來**（清存檔 → 設難度 → 自動走合法步 → 等 AI →
+全程監看 console），抓出邏輯測試看不到的當機/凍結。當初的「移動動畫凍結」就是靠它抓到的。
+
+```bash
+npx playwright install chromium          # 只需一次，下載瀏覽器
+npm run dev                              # 另開一個終端機
+npm run playtest                         # 本機測試（預設 localhost:5173、困難難度）
+URL=https://chinese-checker.netlify.app/ npm run playtest   # 測線上部署版
+ROUNDS=30 DIFFICULTY=normal npm run playtest                # 可調回合數 / 難度
+```
+
+有任何 console / 頁面錯誤或棋盤凍結，腳本會以非 0 結束（可接 CI）。
+
 ## 目前功能
 
 - 2 人本機對戰：紅方與藍方。
