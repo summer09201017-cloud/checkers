@@ -61,6 +61,12 @@ export interface GameState {
   currentPlayerId: PlayerId
   turn: number
   winnerId: PlayerId | null
+  /** True when the game ended without a winner (stall / move cap). */
+  isDraw: boolean
+  /** Lowest combined distance-to-goal seen so far; used to detect stalls. */
+  bestDistanceToGoal: number
+  /** Plies since the last strict improvement of bestDistanceToGoal. */
+  movesSinceProgress: number
   lastMove: TurnRecord | null
   moveHistory: TurnRecord[]
 }

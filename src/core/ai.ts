@@ -1,6 +1,14 @@
-import { CAMP_CELLS, getCell } from './board'
+import { CAMP_CELLS, cubeDistance } from './board'
 import { applyMove, getLegalMoves, getPiecesForPlayer, getPlayer } from './game'
 import type { CellId, GameState, LegalMove, PlayerId } from './types'
+
+/**
+ * Reward for a piece that already rests inside the goal camp. Must dwarf any
+ * single-move distance swing (board distances stay well under 20) so the AI
+ * always prefers parking another piece in the goal over shuffling settled
+ * pieces — this is what stops the endgame stall.
+ */
+const SETTLED_GOAL_REWARD = 100
 
 export type AiDifficulty = 'easy' | 'normal' | 'hard'
 
@@ -26,44 +34,51 @@ export const AI_DIFFICULTY_OPTIONS: Array<{
   },
 ]
 
-function distanceBetween(cellAId: CellId, cellBId: CellId): number {
-  const cellA = getCell(cellAId)
-  const cellB = getCell(cellBId)
-
-  return Math.max(
-    Math.abs(cellA.x - cellB.x),
-    Math.abs(cellA.y - cellB.y),
-    Math.abs(cellA.z - cellB.z),
-  )
+function distanceToGoal(cellId: CellId, goalCells: CellId[]): number {
+  return Math.min(...goalCells.map((goalCellId) => cubeDistance(cellId, goalCellId)))
 }
 
-function distanceToGoal(cellId: CellId, goalCells: CellId[]): number {
-  return Math.min(...goalCells.map((goalCellId) => distanceBetween(cellId, goalCellId)))
+/**
+ * Goal cells that are still empty. Pieces not yet in the goal aim at these
+ * instead of "any goal cell": a piece sitting on the camp edge would otherwise
+ * report distance ~0 to an already-occupied cell and lose all gradient toward
+ * the remaining holes, which is the original endgame stall.
+ */
+function emptyGoalCells(state: GameState, goalCells: CellId[]): CellId[] {
+  const occupied = new Set(state.pieces.map((piece) => piece.cellId))
+
+  return goalCells.filter((goalCellId) => !occupied.has(goalCellId))
 }
 
 function boardDistanceScore(state: GameState, playerId: PlayerId): number {
   const player = getPlayer(state, playerId)
   const goalCells = CAMP_CELLS[player.goalCamp]
-  const homeCells = new Set(CAMP_CELLS[player.homeCamp])
   const goalCellSet = new Set(goalCells)
+  const openGoalCells = emptyGoalCells(state, goalCells)
+  // Once the goal is full, fall back to all cells so the metric stays defined.
+  const targetCells = openGoalCells.length > 0 ? openGoalCells : goalCells
 
   return getPiecesForPlayer(state, playerId).reduce((score, piece) => {
-    const distanceScore = distanceToGoal(piece.cellId, goalCells)
-    const homePenalty = homeCells.has(piece.cellId) ? 0.35 : 0
-    const goalReward = goalCellSet.has(piece.cellId) ? -0.75 : 0
+    if (goalCellSet.has(piece.cellId)) {
+      return score - SETTLED_GOAL_REWARD
+    }
 
-    return score + distanceScore + homePenalty + goalReward
+    return score + distanceToGoal(piece.cellId, targetCells)
   }, 0)
 }
 
 function immediateProgressScore(state: GameState, move: LegalMove): number {
   const player = getPlayer(state, state.currentPlayerId)
   const goalCells = CAMP_CELLS[player.goalCamp]
-  const beforeDistance = distanceToGoal(move.from, goalCells)
-  const afterDistance = distanceToGoal(move.to, goalCells)
+  const goalCellSet = new Set(goalCells)
+  const openGoalCells = emptyGoalCells(state, goalCells)
+  const targetCells = openGoalCells.length > 0 ? openGoalCells : goalCells
+  const beforeDistance = distanceToGoal(move.from, targetCells)
+  const afterDistance = distanceToGoal(move.to, targetCells)
+  const settleBonus = !goalCellSet.has(move.from) && goalCellSet.has(move.to) ? 4 : 0
   const jumpBonus = move.kind === 'jump' ? move.path.length * 0.3 : 0
 
-  return beforeDistance - afterDistance + jumpBonus
+  return beforeDistance - afterDistance + settleBonus + jumpBonus
 }
 
 function hardMoveScore(state: GameState, move: LegalMove): number {

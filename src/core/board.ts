@@ -140,3 +140,14 @@ export function offsetCellId(
 
   return hasCell(nextId) ? nextId : null
 }
+
+export function cubeDistance(cellAId: CellId, cellBId: CellId): number {
+  const cellA = getCell(cellAId)
+  const cellB = getCell(cellBId)
+
+  return Math.max(
+    Math.abs(cellA.x - cellB.x),
+    Math.abs(cellA.y - cellB.y),
+    Math.abs(cellA.z - cellB.z),
+  )
+}

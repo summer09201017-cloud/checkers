@@ -45,7 +45,11 @@ export function useGameController() {
     () => (selectedPieceId ? getLegalMovesForPiece(game, selectedPieceId) : []),
     [game, selectedPieceId],
   )
-  const isAiTurn = isOpponentAiEnabled && game.currentPlayerId === AI_PLAYER_ID && !game.winnerId
+  const isAiTurn =
+    isOpponentAiEnabled &&
+    game.currentPlayerId === AI_PLAYER_ID &&
+    !game.winnerId &&
+    !game.isDraw
 
   useEffect(() => {
     if (game.winnerId) {
@@ -114,7 +118,7 @@ export function useGameController() {
   }, [game, aiDifficulty, isAiTurn, isOpponentAiEnabled])
 
   function selectCell(cellId: CellId) {
-    if (game.winnerId || isAiTurn) {
+    if (game.winnerId || game.isDraw || isAiTurn) {
       return
     }
 
@@ -166,7 +170,7 @@ export function useGameController() {
   }
 
   function showHint() {
-    if (game.winnerId || isAiTurn || !workerRef.current || isAiThinking) return
+    if (game.winnerId || game.isDraw || isAiTurn || !workerRef.current || isAiThinking) return
     
     setIsAiThinking(true)
     const handleMessage = (e: MessageEvent) => {

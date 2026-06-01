@@ -68,6 +68,8 @@ function App() {
     THEME_OPTIONS.find((option) => option.id === themeId)?.description ?? THEME_OPTIONS[0].description
   const statusText = winner
     ? `${winner.name}獲勝`
+    : game.isDraw
+      ? '和局（雙方僵持，已達步數上限）'
     : isAiTurn
       ? `第 ${game.turn} 手，${currentPlayer.name} AI 思考中`
     : `第 ${game.turn} 手，輪到 ${currentPlayer.name}`
@@ -126,7 +128,7 @@ function App() {
               </div>
               <div>
                 <dt>回合</dt>
-                <dd>{winner ? '已結束' : isAiTurn ? 'AI 思考中' : currentPlayer.name}</dd>
+                <dd>{winner || game.isDraw ? '已結束' : isAiTurn ? 'AI 思考中' : currentPlayer.name}</dd>
               </div>
               <div>
                 <dt>選取</dt>
@@ -254,7 +256,7 @@ function App() {
           <section className="panel-section">
             <h2>操作</h2>
             <div className="button-row">
-              <button type="button" onClick={showHint} disabled={isAiTurn || !!winner || isAiThinking}>
+              <button type="button" onClick={showHint} disabled={isAiTurn || !!winner || game.isDraw || isAiThinking}>
                 {isAiThinking ? '思考中...' : '提示'}
               </button>
               <button type="button" onClick={undo} disabled={!canUndo || isAiThinking}>

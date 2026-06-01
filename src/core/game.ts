@@ -1,4 +1,4 @@
-import { CAMP_CELLS, CAMP_SIZE, DIRECTIONS, offsetCellId } from './board'
+import { CAMP_CELLS, CAMP_SIZE, cubeDistance, DIRECTIONS, offsetCellId } from './board'
 import type {
   CellId,
   GameState,
@@ -9,6 +9,11 @@ import type {
   PlayerId,
   TurnRecord,
 } from './types'
+
+/** Hard ceiling on total plies; reaching it ends the game in a draw. */
+export const MAX_PLIES = 400
+/** Plies of no distance-to-goal progress before declaring a draw. */
+export const STALL_PLIES = 100
 
 export const TWO_PLAYER_SETUP: Player[] = [
   {
@@ -57,15 +62,20 @@ function createPiecesForPlayer(player: Player): Piece[] {
 }
 
 export function createInitialGame(): GameState {
-  return {
+  const base: GameState = {
     players: TWO_PLAYER_SETUP,
     pieces: TWO_PLAYER_SETUP.flatMap(createPiecesForPlayer),
     currentPlayerId: 'north',
     turn: 1,
     winnerId: null,
+    isDraw: false,
+    bestDistanceToGoal: 0,
+    movesSinceProgress: 0,
     lastMove: null,
     moveHistory: [],
   }
+
+  return { ...base, bestDistanceToGoal: combinedDistanceToGoals(base) }
 }
 
 export function getPlayer(state: GameState, playerId: PlayerId): Player {
@@ -96,6 +106,38 @@ export function getPiecesForPlayer(state: GameState, playerId: PlayerId): Piece[
 
 function getOccupiedCells(state: GameState): Set<CellId> {
   return new Set(state.pieces.map((piece) => piece.cellId))
+}
+
+function distanceToNearestGoalCell(cellId: CellId, goalCells: CellId[]): number {
+  let nearest = Number.POSITIVE_INFINITY
+
+  for (const goalCellId of goalCells) {
+    const distance = cubeDistance(cellId, goalCellId)
+
+    if (distance < nearest) {
+      nearest = distance
+    }
+  }
+
+  return nearest
+}
+
+/**
+ * Sum, over every piece of every player, of its distance to the nearest cell
+ * of that player's goal camp. A move that advances any piece toward its goal
+ * lowers this number; pure shuffling never sets a new low — which is how
+ * applyMove detects a stall and declares a draw.
+ */
+function combinedDistanceToGoals(state: GameState): number {
+  const goalCellsByPlayer = new Map(
+    state.players.map((player) => [player.id, CAMP_CELLS[player.goalCamp]]),
+  )
+
+  return state.pieces.reduce((total, piece) => {
+    const goalCells = goalCellsByPlayer.get(piece.playerId)
+
+    return goalCells ? total + distanceToNearestGoalCell(piece.cellId, goalCells) : total
+  }, 0)
 }
 
 function getNextPlayerId(state: GameState): PlayerId {
@@ -164,7 +206,7 @@ function getJumpMoves(piece: Piece, occupiedWithoutPiece: Set<CellId>): LegalMov
 }
 
 export function getLegalMovesForPiece(state: GameState, pieceId: PieceId): LegalMove[] {
-  if (state.winnerId) {
+  if (state.winnerId || state.isDraw) {
     return []
   }
 
@@ -215,9 +257,33 @@ export function findLegalMove(
 
 export function hasPlayerWon(state: GameState, playerId: PlayerId): boolean {
   const player = getPlayer(state, playerId)
-  const goalCells = new Set(CAMP_CELLS[player.goalCamp])
+  const goalCells = CAMP_CELLS[player.goalCamp]
+  const occupantByCell = new Map(state.pieces.map((piece) => [piece.cellId, piece.playerId]))
 
-  return getPiecesForPlayer(state, playerId).every((piece) => goalCells.has(piece.cellId))
+  let filled = 0
+  let ownInGoal = 0
+
+  for (const goalCellId of goalCells) {
+    const occupant = occupantByCell.get(goalCellId)
+
+    if (occupant) {
+      filled += 1
+
+      if (occupant === playerId) {
+        ownInGoal += 1
+      }
+    }
+  }
+
+  const blockers = filled - ownInGoal
+
+  // The goal camp is the opponent's home, so requiring all ten own pieces lets
+  // a single parked opponent piece make winning impossible. Instead: win when
+  // the goal camp is completely full and the player holds the majority of it.
+  // A clean sweep (all ten own pieces home) is just the ownInGoal === 10 case;
+  // the majority test blocks both false wins from a parked opponent piece and
+  // the unwinnable deadlock from one stray blocker on the final cell.
+  return filled === goalCells.length && ownInGoal > blockers
 }
 
 export function applyMove(state: GameState, requestedMove: LegalMove): GameState {
@@ -240,7 +306,7 @@ export function applyMove(state: GameState, requestedMove: LegalMove): GameState
     ...move,
     playerId: movedPiece.playerId,
   }
-  const nextState: GameState = {
+  const advanced: GameState = {
     ...state,
     pieces,
     currentPlayerId: getNextPlayerId(state),
@@ -249,8 +315,20 @@ export function applyMove(state: GameState, requestedMove: LegalMove): GameState
     moveHistory: [...state.moveHistory, turnRecord],
   }
 
+  const winnerId = hasPlayerWon(advanced, movedPiece.playerId) ? movedPiece.playerId : null
+
+  const distance = combinedDistanceToGoals(advanced)
+  const improved = distance < state.bestDistanceToGoal
+  const bestDistanceToGoal = improved ? distance : state.bestDistanceToGoal
+  const movesSinceProgress = improved ? 0 : state.movesSinceProgress + 1
+  const isDraw =
+    !winnerId && (advanced.turn > MAX_PLIES || movesSinceProgress >= STALL_PLIES)
+
   return {
-    ...nextState,
-    winnerId: hasPlayerWon(nextState, movedPiece.playerId) ? movedPiece.playerId : null,
+    ...advanced,
+    winnerId,
+    isDraw,
+    bestDistanceToGoal,
+    movesSinceProgress,
   }
 }
