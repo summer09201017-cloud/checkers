@@ -1,0 +1,14 @@
+# Netlify deploy config — connect this repo in Netlify and it auto-detects everything below.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # Vite 7 requires Node >= 20.19 / 22.12; pin a safe LTS.
+  NODE_VERSION = "22"
+
+# Single-page app: serve index.html for any path so deep links / refreshes work.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
