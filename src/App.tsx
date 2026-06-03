@@ -11,6 +11,7 @@ import {
 import { loadPreferences, savePreferences } from './app/storage'
 import { soundManager } from './app/sound'
 import { useMediaQuery } from './app/useMediaQuery'
+import { buildShareUrl } from './app/share'
 import type { PieceVisualStyle } from './renderers/svg2d/ChineseCheckersBoard'
 import type { AiDifficulty, PlayerId } from './core'
 import type { PieceColorId, ThemeId } from './app/appearance'
@@ -25,6 +26,7 @@ function App() {
   const [isMuted, setIsMuted] = useState(soundManager.getMuted())
   const [isBgmPlaying, setIsBgmPlaying] = useState(soundManager.getBgmPlaying())
   const [isOverlayDismissed, setIsOverlayDismissed] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
   const isMobile = useMediaQuery('(max-width: 768px)')
   const [mobileView, setMobileView] = useState<'setup' | 'play'>('setup')
   const {
@@ -113,6 +115,19 @@ function App() {
   function handleToggleBgm() {
     setIsBgmPlaying(soundManager.toggleBgm())
   }
+
+  function handleShare() {
+    const url = buildShareUrl(game)
+    void navigator.clipboard?.writeText(url).catch(() => {})
+    setShareCopied(true)
+    window.setTimeout(() => setShareCopied(false), 1800)
+  }
+
+  const shareButton = (
+    <button type="button" onClick={handleShare} title="複製這局的分享連結">
+      {shareCopied ? '已複製連結 ✓' : '分享連結'}
+    </button>
+  )
 
   // --- Reusable pieces, shared by the desktop side panel and the mobile setup screen ---
   const boardEl = (
@@ -306,6 +321,10 @@ function App() {
                 activeIndex={replayIndex}
               />
             </section>
+            <section className="panel-section">
+              <h2>分享</h2>
+              <div className="button-row">{shareButton}</div>
+            </section>
             {rulesSection}
           </div>
           <button type="button" className="m-start" onClick={() => setMobileView('play')}>
@@ -390,6 +409,7 @@ function App() {
               <button type="button" onClick={handleRestart} disabled={isAiThinking}>
                 重新開始
               </button>
+              {shareButton}
             </div>
           </section>
 

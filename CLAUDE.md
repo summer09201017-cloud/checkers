@@ -64,6 +64,8 @@ scripts/gen-icons.mjs    從 public/app-icon.svg 產生 PWA PNG 圖示
 **體驗功能**
 - 移動/連跳動畫、Web Audio 音效 + BGM、勝利煙火彈窗、AI 提示、手機觸控放大。
 - 自動存檔（localStorage）。
+- **可分享網址**：把整局編碼進連結，對方開啟即完整重現（`src/app/share.ts`；編碼 moveHistory、
+  解碼時逐步重放驗證，壞連結自動退回新局）。桌機「操作」區與手機設定頁都有「分享連結」鈕。
 - 棋譜面板 + **回放**（點某一手重現當時盤面，可返回實況）。
 - **和局彈窗**（VictoryOverlay 也處理和局；彈窗可 ✕ 關閉以回看棋盤）。
 - **手機版兩頁式**：手機（≤768px）自動切換「設定頁 → 全螢幕遊玩 + 底部工具列（提示/悔棋/重來/⚙設定）」；桌機維持側欄版面。
@@ -80,9 +82,9 @@ scripts/gen-icons.mjs    從 public/app-icon.svg 產生 PWA PNG 圖示
 - Netlify 部署設定（`netlify.toml`），已上線。
 
 ### 🔲 真正待做
-1. 可分享網址（把棋局/棋譜編碼進 URL 分享）。〔之前評估為 S，使用者暫未要〕
-2. 更強 AI（minimax/alpha-beta 加深，或 MCTS）。
-3. 本機多人（3–6 人，pass-and-play）。
+1. 更強 AI（minimax/alpha-beta 加深，或 MCTS）。
+2. 本機多人（3–6 人，pass-and-play）。
+3. 盤面編輯器 / 每日挑戰 / 覆盤分析（皆為 game-modes.md 列出的高 CP 模式，可重用現有引擎）。
 4. 3D renderer（重用同一套 core）。
 5. 線上對戰 / 帳號 / 排名（XL，等於另一個專案）。
 

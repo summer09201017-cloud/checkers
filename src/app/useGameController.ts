@@ -13,6 +13,7 @@ import {
 import type { AiDifficulty, CellId, GameState, LegalMove, PieceId, PlayerId, TurnRecord } from '../core'
 import { soundManager } from './sound'
 import { saveGameState, loadGameState, clearGameState, loadPreferences } from './storage'
+import { readSharedGame, clearShareHash } from './share'
 
 const AI_PLAYER_ID: PlayerId = 'south'
 
@@ -31,7 +32,10 @@ function reconstructGameAt(history: TurnRecord[], moveCount: number): GameState 
 
 export function useGameController() {
   const prefs = useMemo(() => loadPreferences(), [])
-  const [game, setGame] = useState<GameState>(() => loadGameState() || createInitialGame())
+  // A shared link wins over the locally saved game, then fall back to a new game.
+  const [game, setGame] = useState<GameState>(
+    () => readSharedGame() || loadGameState() || createInitialGame(),
+  )
   const [selectedPieceId, setSelectedPieceId] = useState<PieceId | null>(null)
   const [pastGames, setPastGames] = useState<GameState[]>([])
   const [isOpponentAiEnabled, setIsOpponentAiEnabled] = useState(prefs.isOpponentAiEnabled)
@@ -47,6 +51,11 @@ export function useGameController() {
     return () => {
       workerRef.current?.terminate()
     }
+  }, [])
+
+  // We've consumed any shared-game link into initial state; clean it from the URL.
+  useEffect(() => {
+    clearShareHash()
   }, [])
 
   const currentPlayer = useMemo(() => getCurrentPlayer(game), [game])
