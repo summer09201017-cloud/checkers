@@ -10,6 +10,7 @@ import {
 } from './app/appearance'
 import { loadPreferences, savePreferences } from './app/storage'
 import { soundManager } from './app/sound'
+import { useMediaQuery } from './app/useMediaQuery'
 import type { PieceVisualStyle } from './renderers/svg2d/ChineseCheckersBoard'
 import type { AiDifficulty, PlayerId } from './core'
 import type { PieceColorId, ThemeId } from './app/appearance'
@@ -24,6 +25,8 @@ function App() {
   const [isMuted, setIsMuted] = useState(soundManager.getMuted())
   const [isBgmPlaying, setIsBgmPlaying] = useState(soundManager.getBgmPlaying())
   const [isOverlayDismissed, setIsOverlayDismissed] = useState(false)
+  const isMobile = useMediaQuery('(max-width: 768px)')
+  const [mobileView, setMobileView] = useState<'setup' | 'play'>('setup')
   const {
     game,
     viewedGame,
@@ -111,6 +114,210 @@ function App() {
     setIsBgmPlaying(soundManager.toggleBgm())
   }
 
+  // --- Reusable pieces, shared by the desktop side panel and the mobile setup screen ---
+  const boardEl = (
+    <ChineseCheckersBoard
+      game={viewedGame}
+      selectedPieceId={isReplaying ? null : selectedPieceId}
+      isInteractionDisabled={isAiTurn || isAiThinking || isReplaying}
+      pieceStyles={pieceStyles}
+      legalMoves={isReplaying ? [] : legalMoves}
+      hintMove={isReplaying ? null : hintMove}
+      onCellSelect={selectCell}
+    />
+  )
+
+  const appearanceSection = (
+    <section className="panel-section">
+      <h2>外觀</h2>
+      <div className="segmented-control" aria-label="主題色">
+        {THEME_OPTIONS.map((theme) => (
+          <button
+            key={theme.id}
+            type="button"
+            className={theme.id === themeId ? 'is-active' : ''}
+            onClick={() => setThemeId(theme.id)}
+          >
+            {theme.label}
+          </button>
+        ))}
+      </div>
+      <p className="control-note">{themeDescription}</p>
+
+      <div className="color-picker-group">
+        <p className="color-picker-title">紅方顏色</p>
+        <div className="swatch-row" aria-label="紅方顏色">
+          {PIECE_COLOR_OPTIONS.map((colorOption) => (
+            <button
+              key={colorOption.id}
+              type="button"
+              className={pieceColorSelection.north === colorOption.id ? 'color-swatch is-active' : 'color-swatch'}
+              style={{ '--swatch-color': colorOption.color } as CSSProperties}
+              aria-label={`紅方${colorOption.label}`}
+              title={`紅方${colorOption.label}`}
+              onClick={() => setPieceColor('north', colorOption.id)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="color-picker-group">
+        <p className="color-picker-title">藍方顏色</p>
+        <div className="swatch-row" aria-label="藍方顏色">
+          {PIECE_COLOR_OPTIONS.map((colorOption) => (
+            <button
+              key={colorOption.id}
+              type="button"
+              className={pieceColorSelection.south === colorOption.id ? 'color-swatch is-active' : 'color-swatch'}
+              style={{ '--swatch-color': colorOption.color } as CSSProperties}
+              aria-label={`藍方${colorOption.label}`}
+              title={`藍方${colorOption.label}`}
+              onClick={() => setPieceColor('south', colorOption.id)}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+
+  const aiSection = (
+    <section className="panel-section">
+      <h2>AI 對手</h2>
+      <label className="checkbox-control">
+        <input
+          type="checkbox"
+          checked={isOpponentAiEnabled}
+          onChange={(event) => setIsOpponentAiEnabled(event.currentTarget.checked)}
+        />
+        <span>藍方交給 AI</span>
+      </label>
+      <label className="select-control">
+        <span>強度</span>
+        <select value={aiDifficulty} onChange={handleAiDifficultyChange} disabled={!isOpponentAiEnabled}>
+          {AI_DIFFICULTY_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="control-note">
+        {AI_DIFFICULTY_OPTIONS.find((option) => option.value === aiDifficulty)?.description}
+      </p>
+    </section>
+  )
+
+  const soundSection = (
+    <section className="panel-section">
+      <h2>聲音</h2>
+      <label className="checkbox-control">
+        <input type="checkbox" checked={!isMuted} onChange={handleToggleMute} />
+        <span>音效</span>
+      </label>
+      <label className="checkbox-control">
+        <input type="checkbox" checked={isBgmPlaying} onChange={handleToggleBgm} />
+        <span>背景音樂</span>
+      </label>
+    </section>
+  )
+
+  const rulesSection = (
+    <section className="panel-section">
+      <h2>規則核心</h2>
+      <ul className="rule-list">
+        <li>點自己的棋子後，綠色圈可直接落子。</li>
+        <li>支援相鄰一步與跨棋跳躍，連跳會自動展開。</li>
+        <li>任一方 10 顆棋全進入對面營區即獲勝。</li>
+      </ul>
+    </section>
+  )
+
+  const overlayEl = !isOverlayDismissed && (
+    <VictoryOverlay
+      winner={winner}
+      isDraw={game.isDraw}
+      turn={game.turn}
+      onRestart={handleRestart}
+      onClose={() => setIsOverlayDismissed(true)}
+    />
+  )
+
+  // ===== Mobile: two-screen flow (setup → full-screen play) =====
+  if (isMobile) {
+    if (mobileView === 'play') {
+      return (
+        <main className="app-shell" data-theme={themeId} data-mobile="play">
+          <div className="mobile-play">
+            <div
+              className={isReplaying ? 'm-statusbar is-replay' : 'm-statusbar'}
+              style={{ '--player-color': currentPlayerColor } as CSSProperties}
+              onClick={isReplaying ? exitReplay : undefined}
+            >
+              {isReplaying
+                ? `🔁 回放：第 ${(replayIndex ?? 0) + 1} 手 · 點此返回實況`
+                : statusText}
+            </div>
+            <div className="m-board">{boardEl}</div>
+            <nav className="m-toolbar" aria-label="遊戲操作">
+              <button
+                type="button"
+                onClick={showHint}
+                disabled={isAiTurn || !!winner || game.isDraw || isAiThinking || isReplaying}
+              >
+                {isAiThinking ? '思考中' : '提示'}
+              </button>
+              <button type="button" onClick={handleUndo} disabled={!canUndo || isAiThinking}>
+                悔棋
+              </button>
+              <button type="button" onClick={handleRestart} disabled={isAiThinking}>
+                重來
+              </button>
+              <button type="button" onClick={() => setMobileView('setup')}>
+                ⚙ 設定
+              </button>
+            </nav>
+          </div>
+          {overlayEl}
+        </main>
+      )
+    }
+
+    return (
+      <main className="app-shell" data-theme={themeId} data-mobile="setup">
+        <div className="mobile-setup">
+          <header className="app-header">
+            <div>
+              <p className="eyebrow">中國跳棋</p>
+              <h1>遊戲設定</h1>
+            </div>
+          </header>
+          <div className="m-setup-scroll">
+            {appearanceSection}
+            {aiSection}
+            {soundSection}
+            <section className="panel-section">
+              <MoveLog
+                moveHistory={game.moveHistory}
+                gamePlayers={game.players}
+                onReplayTo={(index) => {
+                  replayTo(index)
+                  setMobileView('play')
+                }}
+                activeIndex={replayIndex}
+              />
+            </section>
+            {rulesSection}
+          </div>
+          <button type="button" className="m-start" onClick={() => setMobileView('play')}>
+            {game.moveHistory.length > 0 && !winner && !game.isDraw ? '繼續對局' : '開始遊戲'}
+          </button>
+        </div>
+        {overlayEl}
+      </main>
+    )
+  }
+
+  // ===== Desktop: header + board + side panel =====
   return (
     <main className="app-shell" data-theme={themeId}>
       <header className="app-header">
@@ -124,17 +331,7 @@ function App() {
       </header>
 
       <section className="game-layout">
-        <div className="board-stage">
-          <ChineseCheckersBoard
-            game={viewedGame}
-            selectedPieceId={isReplaying ? null : selectedPieceId}
-            isInteractionDisabled={isAiTurn || isAiThinking || isReplaying}
-            pieceStyles={pieceStyles}
-            legalMoves={isReplaying ? [] : legalMoves}
-            hintMove={isReplaying ? null : hintMove}
-            onCellSelect={selectCell}
-          />
-        </div>
+        <div className="board-stage">{boardEl}</div>
 
         <aside className="side-panel" aria-label="遊戲狀態">
           <section className="panel-section">
@@ -177,105 +374,9 @@ function App() {
             />
           </section>
 
-          <section className="panel-section">
-            <h2>外觀</h2>
-            <div className="segmented-control" aria-label="主題色">
-              {THEME_OPTIONS.map((theme) => (
-                <button
-                  key={theme.id}
-                  type="button"
-                  className={theme.id === themeId ? 'is-active' : ''}
-                  onClick={() => setThemeId(theme.id)}
-                >
-                  {theme.label}
-                </button>
-              ))}
-            </div>
-            <p className="control-note">{themeDescription}</p>
-
-            <div className="color-picker-group">
-              <p className="color-picker-title">紅方顏色</p>
-              <div className="swatch-row" aria-label="紅方顏色">
-                {PIECE_COLOR_OPTIONS.map((colorOption) => (
-                  <button
-                    key={colorOption.id}
-                    type="button"
-                    className={pieceColorSelection.north === colorOption.id ? 'color-swatch is-active' : 'color-swatch'}
-                    style={{ '--swatch-color': colorOption.color } as CSSProperties}
-                    aria-label={`紅方${colorOption.label}`}
-                    title={`紅方${colorOption.label}`}
-                    onClick={() => setPieceColor('north', colorOption.id)}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="color-picker-group">
-              <p className="color-picker-title">藍方顏色</p>
-              <div className="swatch-row" aria-label="藍方顏色">
-                {PIECE_COLOR_OPTIONS.map((colorOption) => (
-                  <button
-                    key={colorOption.id}
-                    type="button"
-                    className={pieceColorSelection.south === colorOption.id ? 'color-swatch is-active' : 'color-swatch'}
-                    style={{ '--swatch-color': colorOption.color } as CSSProperties}
-                    aria-label={`藍方${colorOption.label}`}
-                    title={`藍方${colorOption.label}`}
-                    onClick={() => setPieceColor('south', colorOption.id)}
-                  />
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="panel-section">
-            <h2>AI 對手</h2>
-            <label className="checkbox-control">
-              <input
-                type="checkbox"
-                checked={isOpponentAiEnabled}
-                onChange={(event) => setIsOpponentAiEnabled(event.currentTarget.checked)}
-              />
-              <span>藍方交給 AI</span>
-            </label>
-            <label className="select-control">
-              <span>強度</span>
-              <select
-                value={aiDifficulty}
-                onChange={handleAiDifficultyChange}
-                disabled={!isOpponentAiEnabled}
-              >
-                {AI_DIFFICULTY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p className="control-note">
-              {AI_DIFFICULTY_OPTIONS.find((option) => option.value === aiDifficulty)?.description}
-            </p>
-          </section>
-
-          <section className="panel-section">
-            <h2>聲音</h2>
-            <label className="checkbox-control">
-              <input
-                type="checkbox"
-                checked={!isMuted}
-                onChange={handleToggleMute}
-              />
-              <span>音效</span>
-            </label>
-            <label className="checkbox-control">
-              <input
-                type="checkbox"
-                checked={isBgmPlaying}
-                onChange={handleToggleBgm}
-              />
-              <span>背景音樂</span>
-            </label>
-          </section>
+          {appearanceSection}
+          {aiSection}
+          {soundSection}
 
           <section className="panel-section">
             <h2>操作</h2>
@@ -292,26 +393,11 @@ function App() {
             </div>
           </section>
 
-          <section className="panel-section">
-            <h2>規則核心</h2>
-            <ul className="rule-list">
-              <li>點自己的棋子後，綠色圈可直接落子。</li>
-              <li>支援相鄰一步與跨棋跳躍，連跳會自動展開。</li>
-              <li>任一方 10 顆棋全進入對面營區即獲勝。</li>
-            </ul>
-          </section>
+          {rulesSection}
         </aside>
       </section>
 
-      {!isOverlayDismissed && (
-        <VictoryOverlay
-          winner={winner}
-          isDraw={game.isDraw}
-          turn={game.turn}
-          onRestart={handleRestart}
-          onClose={() => setIsOverlayDismissed(true)}
-        />
-      )}
+      {overlayEl}
     </main>
   )
 }

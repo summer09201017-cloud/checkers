@@ -374,3 +374,111 @@ button:disabled {
   }
 }
 
+/* ===== Mobile two-screen flow (rendered only when isMobile; see App.tsx) ===== */
+.app-shell[data-mobile] {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mobile-setup,
+.mobile-play {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Setup screen --- */
+.mobile-setup .app-header {
+  flex: 0 0 auto;
+}
+
+.m-setup-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 18px clamp(14px, 4vw, 22px);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.m-setup-scroll .panel-section + .panel-section {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.m-start {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 0;
+  min-height: 56px;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--move-target);
+}
+
+.m-start:hover:not(:disabled),
+.m-start:focus-visible:not(:disabled) {
+  background: var(--move-target);
+  filter: brightness(1.06);
+}
+
+/* --- Play screen (full-screen board + slim toolbar) --- */
+.mobile-play {
+  height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+}
+
+.m-statusbar {
+  --player-color: #1c8b80;
+  flex: 0 0 auto;
+  text-align: center;
+  padding: 10px 12px;
+  font-weight: 800;
+  color: var(--text-strong);
+  background: color-mix(in srgb, var(--player-color) 10%, var(--surface));
+  border-bottom: 2px solid var(--player-color);
+}
+
+.m-statusbar.is-replay {
+  cursor: pointer;
+  --player-color: var(--move-last);
+}
+
+.m-board {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  overflow: hidden;
+}
+
+.m-board .checker-board {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.m-toolbar {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--panel-border);
+  background: var(--surface);
+}
+
+.m-toolbar button {
+  min-height: 48px;
+  padding: 6px 4px;
+}
+

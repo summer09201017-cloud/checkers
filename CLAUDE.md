@@ -66,6 +66,7 @@ scripts/gen-icons.mjs    從 public/app-icon.svg 產生 PWA PNG 圖示
 - 自動存檔（localStorage）。
 - 棋譜面板 + **回放**（點某一手重現當時盤面，可返回實況）。
 - **和局彈窗**（VictoryOverlay 也處理和局；彈窗可 ✕ 關閉以回看棋盤）。
+- **手機版兩頁式**：手機（≤768px）自動切換「設定頁 → 全螢幕遊玩 + 底部工具列（提示/悔棋/重來/⚙設定）」；桌機維持側欄版面。
 
 **正確性修復（本輪重點，原本「遊戲永遠不會結束」）**
 - 修 AI 收尾卡死：改瞄準最近**空**終點格 + 進營大獎勵。
@@ -79,12 +80,11 @@ scripts/gen-icons.mjs    從 public/app-icon.svg 產生 PWA PNG 圖示
 - Netlify 部署設定（`netlify.toml`），已上線。
 
 ### 🔲 真正待做
-1. **【進行中・最高優先】手機版兩頁式版面**（設計已定案，尚未實作）——見下方規格。
-2. 可分享網址（把棋局/棋譜編碼進 URL 分享）。〔之前評估為 S，使用者暫未要〕
-3. 更強 AI（minimax/alpha-beta 加深，或 MCTS）。
-4. 本機多人（3–6 人，pass-and-play）。
-5. 3D renderer（重用同一套 core）。
-6. 線上對戰 / 帳號 / 排名（XL，等於另一個專案）。
+1. 可分享網址（把棋局/棋譜編碼進 URL 分享）。〔之前評估為 S，使用者暫未要〕
+2. 更強 AI（minimax/alpha-beta 加深，或 MCTS）。
+3. 本機多人（3–6 人，pass-and-play）。
+4. 3D renderer（重用同一套 core）。
+5. 線上對戰 / 帳號 / 排名（XL，等於另一個專案）。
 
 ### ⚠️ 已知技術債
 - 約 **6 個既有 lint 錯誤**（`set-state-in-effect` / `no-explicit-any`）在 `ChineseCheckersBoard.tsx`、
@@ -93,8 +93,12 @@ scripts/gen-icons.mjs    從 public/app-icon.svg 產生 PWA PNG 圖示
 
 ---
 
-## 待做主項規格：手機版兩頁式（已與使用者定案）
-**目標**：手機上把棋盤放到最大。桌機維持現狀。
+## 已完成：手機版兩頁式（實作說明，2026-06-03）
+**目標**：手機上把棋盤放到最大。桌機維持現狀。**已實作並實機驗證**（iPhone 視窗 0 錯誤）。
+實作落點：`src/app/useMediaQuery.ts`（≤768px 判定）、`src/App.tsx`（`mobileView: 'setup' | 'play'`
+分支，設定區塊抽成可重用 JSX 與桌機側欄共用）、`src/App.css`（`.mobile-setup` / `.mobile-play`
+/ `.m-toolbar`，`100dvh` + `env(safe-area-inset-*)`）。手機棋譜點某一手會跳到遊玩頁顯示該盤面，
+狀態列在回放時點一下即返回實況。
 
 - **套用範圍**：**只在手機/窄螢幕**（建議 `max-width: 768px` 或沿用既有 960px 斷點）。桌機/平板維持現在的
   header + 棋盤 + 側欄版面，不動。
