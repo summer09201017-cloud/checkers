@@ -5,6 +5,7 @@ import {
   CAMP_CELLS,
   cellId,
   chooseAiMove,
+  createGameFromSetup,
   createInitialGame,
   getLegalMovesForPiece,
   hasPlayerWon,
@@ -144,6 +145,39 @@ describe('勝利與封鎖規則', () => {
 
   it('終點未填滿時不算勝', () => {
     expect(hasPlayerWon(createInitialGame(), 'north')).toBe(false)
+  })
+})
+
+describe('盤面編輯器核心：createGameFromSetup', () => {
+  it('依擺放與先手建立合法、可玩的對局', () => {
+    const game = createGameFromSetup(
+      [
+        { cellId: cellId(0, -4), playerId: 'north' },
+        { cellId: cellId(2, -6), playerId: 'north' },
+        { cellId: cellId(0, 4), playerId: 'south' },
+      ],
+      'south',
+    )
+
+    expect(game.currentPlayerId).toBe('south')
+    expect(game.pieces).toHaveLength(3)
+    expect(game.pieces.filter((p) => p.playerId === 'north')).toHaveLength(2)
+    expect(game.winnerId).toBeNull()
+    expect(game.isDraw).toBe(false)
+    expect(game.moveHistory).toHaveLength(0)
+    // ids are regenerated per player, and the built pieces are usable by the engine
+    expect(game.pieces.map((p) => p.id).sort()).toEqual(['north-1', 'north-2', 'south-1'])
+    const south = game.pieces.find((p) => p.playerId === 'south')!
+    expect(() => getLegalMovesForPiece(game, south.id)).not.toThrow()
+  })
+
+  it('可直接手建測試盤面：北方全部進入南營 → 判北方勝', () => {
+    const won = createGameFromSetup(
+      CAMP_CELLS.south.map((c) => ({ cellId: c, playerId: 'north' as const })),
+      'south',
+    )
+
+    expect(hasPlayerWon(won, 'north')).toBe(true)
   })
 })
 

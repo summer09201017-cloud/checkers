@@ -1,0 +1,74 @@
+.editor-shell {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  padding-top: env(safe-area-inset-top);
+}
+
+.editor-header {
+  flex: 0 0 auto;
+  padding: 12px clamp(14px, 4vw, 24px);
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.editor-header h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+
+.editor-board {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  overflow: hidden;
+}
+
+.editor-board .checker-board {
+  width: 100%;
+  height: 100%;
+  max-width: 560px;
+  max-height: 100%;
+}
+
+.editor-controls {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 10px;
+  padding: 12px clamp(14px, 4vw, 24px) calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--panel-border);
+  background: var(--surface);
+}
+
+.editor-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.editor-label {
+  min-width: 48px;
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.editor-row .segmented-control {
+  flex: 1;
+}
+
+.editor-brush {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.editor-apply {
+  background: var(--move-target);
+  color: #fff;
+  border: 0;
+}
+
+.editor-apply:hover:not(:disabled),
+.editor-apply:focus-visible:not(:disabled) {
+  background: var(--move-target);
+  filter: brightness(1.06);
+}

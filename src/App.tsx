@@ -2,6 +2,7 @@ import { AI_DIFFICULTY_OPTIONS, BOARD_CELLS } from './core'
 import { useGameController } from './app/useGameController'
 import { MoveLog } from './app/MoveLog'
 import { VictoryOverlay } from './app/VictoryOverlay'
+import { PositionEditor } from './app/PositionEditor'
 import { ChineseCheckersBoard } from './renderers/svg2d/ChineseCheckersBoard'
 import {
   PIECE_COLOR_OPTIONS,
@@ -27,6 +28,7 @@ function App() {
   const [isBgmPlaying, setIsBgmPlaying] = useState(soundManager.getBgmPlaying())
   const [isOverlayDismissed, setIsOverlayDismissed] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
+  const [editorActive, setEditorActive] = useState(false)
   const isMobile = useMediaQuery('(max-width: 768px)')
   const [mobileView, setMobileView] = useState<'setup' | 'play'>('setup')
   const {
@@ -54,6 +56,7 @@ function App() {
     showHint,
     replayTo,
     exitReplay,
+    loadGame,
   } = useGameController()
 
   useEffect(() => {
@@ -126,6 +129,12 @@ function App() {
   const shareButton = (
     <button type="button" onClick={handleShare} title="複製這局的分享連結">
       {shareCopied ? '已複製連結 ✓' : '分享連結'}
+    </button>
+  )
+
+  const editorButton = (
+    <button type="button" onClick={() => setEditorActive(true)} title="開啟盤面編輯器（出題／教學／測試）">
+      盤面編輯器
     </button>
   )
 
@@ -257,6 +266,26 @@ function App() {
     />
   )
 
+  // ===== Position editor (takes over the whole screen on any device) =====
+  if (editorActive) {
+    return (
+      <PositionEditor
+        initialGame={game}
+        themeId={themeId}
+        pieceStyles={pieceStyles}
+        onApply={(state) => {
+          loadGame(state)
+          setIsOverlayDismissed(false)
+          setEditorActive(false)
+          if (isMobile) {
+            setMobileView('play')
+          }
+        }}
+        onCancel={() => setEditorActive(false)}
+      />
+    )
+  }
+
   // ===== Mobile: two-screen flow (setup → full-screen play) =====
   if (isMobile) {
     if (mobileView === 'play') {
@@ -322,8 +351,11 @@ function App() {
               />
             </section>
             <section className="panel-section">
-              <h2>分享</h2>
-              <div className="button-row">{shareButton}</div>
+              <h2>分享 / 工具</h2>
+              <div className="button-row">
+                {shareButton}
+                {editorButton}
+              </div>
             </section>
             {rulesSection}
           </div>
@@ -410,6 +442,7 @@ function App() {
                 重新開始
               </button>
               {shareButton}
+              {editorButton}
             </div>
           </section>
 

@@ -183,6 +183,15 @@ export function useGameController() {
     clearGameState()
   }
 
+  // Replace the live game with an arbitrary state (e.g. from the position editor
+  // or a loaded position), starting a fresh history from it.
+  function loadGame(next: GameState) {
+    setGame(next)
+    setPastGames([])
+    setSelectedPieceId(null)
+    setReplayIndex(null)
+  }
+
   // Review the position after move `index`. Clicking the latest move (or beyond)
   // snaps back to live play.
   function replayTo(index: number) {
@@ -253,5 +262,6 @@ export function useGameController() {
     showHint,
     replayTo,
     exitReplay,
+    loadGame,
   }
 }

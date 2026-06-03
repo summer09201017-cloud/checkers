@@ -78,6 +78,38 @@ export function createInitialGame(): GameState {
   return { ...base, bestDistanceToGoal: combinedDistanceToGoals(base) }
 }
 
+/**
+ * Build a fresh, playable game from an arbitrary placement of pieces and a
+ * side to move. Powers the position editor (author puzzles / teaching setups)
+ * and is equally handy for authoring hand-built test positions in unit tests.
+ * Piece ids are regenerated per player so the result is well-formed.
+ */
+export function createGameFromSetup(
+  placements: Array<{ cellId: CellId; playerId: PlayerId }>,
+  currentPlayerId: PlayerId = 'north',
+): GameState {
+  const counts: Record<PlayerId, number> = { north: 0, south: 0 }
+  const pieces: Piece[] = placements.map(({ cellId: pieceCellId, playerId }) => {
+    counts[playerId] += 1
+    return { id: `${playerId}-${counts[playerId]}`, playerId, cellId: pieceCellId }
+  })
+
+  const base: GameState = {
+    players: TWO_PLAYER_SETUP,
+    pieces,
+    currentPlayerId,
+    turn: 1,
+    winnerId: null,
+    isDraw: false,
+    bestDistanceToGoal: 0,
+    movesSinceProgress: 0,
+    lastMove: null,
+    moveHistory: [],
+  }
+
+  return { ...base, bestDistanceToGoal: combinedDistanceToGoals(base) }
+}
+
 export function getPlayer(state: GameState, playerId: PlayerId): Player {
   const player = state.players.find((candidate) => candidate.id === playerId)
 
