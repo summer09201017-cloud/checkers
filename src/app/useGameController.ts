@@ -14,6 +14,17 @@ import type { AiDifficulty, CellId, GameState, LegalMove, PieceId, PlayerId, Tur
 import { soundManager } from './sound'
 import { saveGameState, loadGameState, clearGameState, loadPreferences } from './storage'
 import { readSharedGame, clearShareHash } from './share'
+import {
+  DAILY_SET_SIZE,
+  applyDailyResult,
+  applyPuzzleMove,
+  dailyKey,
+  dailySolvedMap,
+  gameFromPuzzle,
+  isSolved,
+  puzzlesForDate,
+} from '../core/daily'
+import type { DailyPuzzle } from '../core/daily'
 
 const AI_PLAYER_ID: PlayerId = 'south'
 
@@ -44,6 +55,16 @@ export function useGameController() {
   const [isAiThinking, setIsAiThinking] = useState(false)
   // Index into moveHistory currently being reviewed; null = following live play.
   const [replayIndex, setReplayIndex] = useState<number | null>(null)
+  /* 📅 每日殘局:非 null = 正在解今天那一組的某一題(單人,沒有對手)。
+     ★ AI 的 effect 看 isAiTurn,而每日模式 currentPlayerId 永遠是解題方
+       ⇒ AI 天生不會被觸發,不用另外加開關。 */
+  const [dailyPuzzle, setDailyPuzzle] = useState<DailyPuzzle | null>(null)
+  const [dailySolvedAt, setDailySolvedAt] = useState<number | null>(null)   // 這題解出來時用了幾步
+  /* 📅 今天已解的題:{ 題id: 最少步數 }。
+     ★ 這份**進 state**(不是每次去讀 localStorage):進度要跟著「剛解完」立刻更新,
+       而 localStorage 是外部可變狀態、React 看不到它的寫入。
+       state 當唯一真相、localStorage 只負責持久化 ⇒ 依賴關係全是真的,不必騙 lint。 */
+  const [dailySolved, setDailySolved] = useState<Record<string, number>>({})
   const workerRef = useRef<Worker>(null)
 
   useEffect(() => {
@@ -165,7 +186,20 @@ export function useGameController() {
 
       if (move) {
         setPastGames((history) => [...history, game])
-        setGame((currentGame) => applyMove(currentGame, move))
+        /* 📅 每日殘局:走完要把回合轉回解題方(單人題沒有對手)⇒ 走 applyPuzzleMove。
+           解完的那一刻記成績(每題分開記、取最少步)。 */
+        setGame((currentGame) => {
+          if (!dailyPuzzle) return applyMove(currentGame, move)
+          const next = applyPuzzleMove(currentGame, move)
+          if (isSolved(next, dailyPuzzle)) {
+            const moves = next.moveHistory.length
+            const r = applyDailyResult(dailyPuzzle.key, dailyPuzzle.id, moves)   // 持久化
+            setDailySolvedAt(moves)
+            setDailySolved((m) => ({ ...m, [dailyPuzzle.id]: r.best }))          // state=唯一真相
+            soundManager.play('win')
+          }
+          return next
+        })
         setSelectedPieceId(null)
         return
       }
@@ -180,8 +214,43 @@ export function useGameController() {
     setPastGames([])
     setSelectedPieceId(null)
     setReplayIndex(null)
+    setDailyPuzzle(null)      // 📅 一般開局=離開每日模式
+    setDailySolvedAt(null)
     clearGameState()
   }
+
+  /* 📅 每日殘局:開今天那一組的第 n 題(不給=今天還沒解的第一題;全解完 → 回第 1 題可重解)。 */
+  function startDaily(n?: number) {
+    const key = dailyKey()
+    const set = puzzlesForDate(key)
+    const solved = dailySolvedMap(key)
+    const index = Number.isInteger(n)
+      ? Math.max(0, Math.min(n as number, set.length - 1))
+      : Math.max(0, set.findIndex((p) => !solved[p.id]))
+    const puzzle = set[index]
+    setDailyPuzzle(puzzle)
+    setDailySolvedAt(null)
+    setDailySolved(solved)        // 今天已解的題讀進 state(之後都以 state 為準)
+    setGame(gameFromPuzzle(puzzle))
+    setPastGames([])
+    setSelectedPieceId(null)
+    setReplayIndex(null)
+  }
+
+  /* 📅 今天那一組。★ 一定要 memo:puzzlesForDate 內含 BFS(一組約 0.3 秒),
+     每次 render 重算會讓整個 UI 卡住。 */
+  const dailySet = useMemo(
+    () => (dailyPuzzle ? puzzlesForDate(dailyPuzzle.key) : null),
+    [dailyPuzzle],
+  )
+
+  /** 📅 今天的進度(純粹從 state 算 ⇒ 依賴關係全是真的) */
+  const dailyProgress = useMemo(() => {
+    if (!dailyPuzzle || !dailySet) return null
+    const done = dailySet.filter((p) => dailySolved[p.id]).length
+    const nextIndex = dailySet.findIndex((p) => !dailySolved[p.id] && p.id !== dailyPuzzle.id)
+    return { total: dailySet.length, done, solved: dailySolved, nextIndex, best: dailySolved[dailyPuzzle.id] ?? null }
+  }, [dailyPuzzle, dailySet, dailySolved])
 
   // Replace the live game with an arbitrary state (e.g. from the position editor
   // or a loaded position), starting a fresh history from it.
@@ -263,5 +332,22 @@ export function useGameController() {
     replayTo,
     exitReplay,
     loadGame,
+    // 📅 每日殘局
+    dailyPuzzle,
+    dailyProgress,
+    dailySolvedAt,
+    dailySetSize: DAILY_SET_SIZE,
+    startDaily,
   }
+}
+
+/* 測試掛勾(驗收腳本用;艦隊慣例)——真人操作不經過它。
+   ★ 只讀:驗收腳本要知道「這一題的目標格是哪幾格」才導航得動
+     (產線 bundle 沒辦法 import 原始碼)。 */
+export function exposeDailyHook(value: {
+  puzzle: DailyPuzzle | null
+  cells: string[]
+  startDaily: (n?: number) => void
+}) {
+  ;(window as unknown as { __checkersDaily?: unknown }).__checkersDaily = value
 }

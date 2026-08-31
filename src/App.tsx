@@ -1,5 +1,5 @@
 import { AI_DIFFICULTY_OPTIONS, BOARD_CELLS } from './core'
-import { useGameController } from './app/useGameController'
+import { exposeDailyHook, useGameController } from './app/useGameController'
 import { MoveLog } from './app/MoveLog'
 import { VictoryOverlay } from './app/VictoryOverlay'
 import { PositionEditor } from './app/PositionEditor'
@@ -57,6 +57,10 @@ function App() {
     replayTo,
     exitReplay,
     loadGame,
+    dailyPuzzle,
+    dailyProgress,
+    dailySolvedAt,
+    startDaily,
   } = useGameController()
 
   useEffect(() => {
@@ -245,6 +249,82 @@ function App() {
     </section>
   )
 
+  /* 📅 測試掛勾:驗收腳本要知道「這題的目標格」才導航得動(產線 bundle 不能 import 原始碼) */
+  useEffect(() => {
+    exposeDailyHook({
+      puzzle: dailyPuzzle,
+      cells: game.pieces.map((p) => p.cellId),
+      startDaily,
+    })
+  }, [dailyPuzzle, game, startDaily])
+
+  /* 📅 每日殘局(跳棋・D 型)。桌機側欄與手機設定頁共用同一段 JSX。
+     ★ 解完了才出現「下一題」——沒解完給那顆會讓孩子以為可以跳過。 */
+  const dailySection = (
+    <section className="panel-section">
+      <h2>📅 每日殘局</h2>
+      {dailyPuzzle ? (
+        <>
+          <p className="rule-list" style={{ listStyle: 'none', margin: '0 0 8px', lineHeight: 1.7 }}>
+            {dailyPuzzle.key} 第 {dailyPuzzle.n + 1}/{dailyProgress?.total ?? 5} 題
+            (今天已解 {dailyProgress?.done ?? 0} 題)
+            <br />
+            目標:<b>{dailyPuzzle.minMoves} 步</b>把 {dailyPuzzle.start.length} 顆棋子全部走進對面營區
+            ・已走 <b>{game.moveHistory.length}</b> 步
+            {dailyProgress?.best ? `(這題你的最佳:${dailyProgress.best} 步)` : ''}
+            <br />
+            <span style={{ opacity: 0.8 }}>{dailyPuzzle.hint}</span>
+          </p>
+          {dailySolvedAt !== null && (
+            <p className="rule-list" style={{ listStyle: 'none', margin: '0 0 8px', fontWeight: 700 }}>
+              🎉 解出來了!用了 {dailySolvedAt} 步
+              {dailySolvedAt <= dailyPuzzle.minMoves ? '——最少步數,滿分!' : `(最少 ${dailyPuzzle.minMoves} 步)`}
+            </p>
+          )}
+          <div className="button-row">
+            {dailySolvedAt !== null && (dailyProgress?.nextIndex ?? -1) >= 0 && (
+              <button type="button" onClick={() => startDaily(dailyProgress?.nextIndex)}>
+                📅 下一題
+              </button>
+            )}
+            <button type="button" onClick={() => startDaily(dailyPuzzle.n)}>
+              🔁 這題重來
+            </button>
+            <button type="button" onClick={handleRestart}>
+              離開每日殘局
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="rule-list" style={{ listStyle: 'none', margin: '0 0 8px', lineHeight: 1.7 }}>
+            每天一組 <b>5 題</b>、全世界同一組:把幾顆棋子在最少步數內全部走進對面營區。
+            每一題的最少步數都由電腦窮舉算過,不是猜的。
+          </p>
+          <div className="button-row">
+            <button type="button" onClick={() => startDaily()}>
+              📅 開始今天的每日殘局
+            </button>
+          </div>
+        </>
+      )}
+    </section>
+  )
+
+  /* 版本簡歷(game-must-haves ⑦):讓使用者判斷自己開到的是不是新版。
+     ★ 寫死在畫面上,不從 SW 問——JS 掛了也還看得到。 */
+  const verTagSection = (
+    <section className="panel-section">
+      <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.7, margin: 0 }}>
+        版本 v2(2026-08-31)・📅 新增「每日殘局」:每天一組 <b>5 題</b>、全世界同一組——
+        在最少步數內把幾顆棋子全部走進對面營區;<b>每一題的最少步數都由電腦窮舉算過</b>,
+        每題分開記成績,明天換新的一組。
+        <br />
+        前幾版:v1 中國跳棋(對 AI 三檔/悔棋/棋譜回放/盤面編輯器/可分享連結/PWA)
+      </p>
+    </section>
+  )
+
   const rulesSection = (
     <section className="panel-section">
       <h2>規則核心</h2>
@@ -336,6 +416,7 @@ function App() {
             </div>
           </header>
           <div className="m-setup-scroll">
+            {dailySection}
             {appearanceSection}
             {aiSection}
             {soundSection}
@@ -358,6 +439,7 @@ function App() {
               </div>
             </section>
             {rulesSection}
+            {verTagSection}
           </div>
           <button type="button" className="m-start" onClick={() => setMobileView('play')}>
             {game.moveHistory.length > 0 && !winner && !game.isDraw ? '繼續對局' : '開始遊戲'}
@@ -446,7 +528,10 @@ function App() {
             </div>
           </section>
 
+          {dailySection}
+
           {rulesSection}
+          {verTagSection}
         </aside>
       </section>
 

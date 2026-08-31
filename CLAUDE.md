@@ -14,6 +14,7 @@ npm install
 npm run dev        # 開發伺服器 http://localhost:5173
 npm run test       # 規則引擎單元測試 + 自我對弈（Node，13 個測試）
 npm run playtest   # 瀏覽器自動試玩（需先 npx playwright install chromium）
+npm run daily:check # 📅 每日殘局冒煙（先 npm run build && npx vite preview --port 4185）
 npm run lint       # eslint
 npm run build      # tsc -b && vite build（產出含 PWA manifest + service worker）
 ```
@@ -29,6 +30,8 @@ src/
     ai.ts                AI 選步（easy/normal/hard）
     ai.worker.ts         Web Worker：把 AI 運算移出主執行緒（避免卡 UI）
     game.test.ts         單元 + 自我對弈 + 回放重現 測試
+    daily.ts             📅 每日殘局:反向生成題目 + BFS 精確最少步 + 戰績(見下方專段)
+    daily.test.ts        每日殘局 21 項(可解性/步數精確/決定性/戰績)
   app/                   React 控制器與外觀（薄膠水層，無規則）
     useGameController.ts 回合/選子/悔棋/AI 觸發/回放(viewedGame) 狀態
     appearance.ts        主題與棋子顏色
@@ -38,6 +41,7 @@ src/
     VictoryOverlay.tsx   勝利/和局彈窗（煙火、可關閉 ✕）
   renderers/svg2d/       2D SVG 棋盤（只讀 GameState、發出點擊意圖；含移動動畫）
 e2e/playtest.mjs         Playwright 瀏覽器自動試玩腳本（npm run playtest）
+e2e/daily-check.mts      📅 每日殘局冒煙（npm run daily:check；解法先用引擎 BFS 算好再餵真點擊）
 scripts/gen-icons.mjs    從 public/app-icon.svg 產生 PWA PNG 圖示
 ```
 
@@ -86,9 +90,38 @@ scripts/gen-icons.mjs    從 public/app-icon.svg 產生 PWA PNG 圖示
 ### 🔲 真正待做
 1. 更強 AI（minimax/alpha-beta 加深，或 MCTS）。
 2. 本機多人（3–6 人，pass-and-play）。
-3. 每日挑戰 / 覆盤分析（game-modes.md 的高 CP 模式；可重用現有引擎、回放與盤面編輯器）。
+3. ~~每日挑戰~~ **✅ 2026-08-31 完工:📅 每日殘局**(見下方「每日殘局」段);覆盤分析仍待做。
 4. 3D renderer（重用同一套 core）。
 5. 線上對戰 / 帳號 / 排名（XL，等於另一個專案）。
+
+## 📅 每日殘局(2026-08-31 完工;跨專案範式見 skill `daily-puzzle-kit` 的 D 型)
+
+**題型**:「N 步內把 K 顆棋子全部走進對面營區」——單人解謎、沒有對手。
+每天一組 5 題、全世界同一組(日期台北 UTC+8 → FNV → mulberry32 決定性亂數)。
+棋子數 2/3/4/4/4、步數遞增;每題分開記最少步(`checkers:daily:v1`,留 60 天,零上傳)。
+
+**★★ 可解性怎麼保證(這一款與其他四款最不同的地方)**:
+- **反向生成**:從「全部棋子已在目標營」的終局倒退 N 步 ⇒ 起始局面**天生保證可解**
+  (倒推的每一步反過來走就是一組解法)。比「隨機擺+驗、無解重擺」便宜太多。
+  ⚠ 前提=走法可逆(step 顯然可逆;jump 的條件反向也成立)——`daily.test.ts` 有守。
+- **BFS 算精確最少步**:倒推 N 步不代表真的要 N 步。公佈的步數必須精確,
+  否則孩子照最少步走完卻被說「還沒達標」。
+
+**⚠ 三個接縫(都是實際踩到才發現的)**:
+1. **解題方必須是 `north`**:這個 App 的 AI 固定扮演 `south`,若解題方設 south,
+   一進每日模式 **AI 就會搶著幫你走**。設 north ⇒ AI 天生不觸發,不必另加開關。
+2. **走一步要把回合轉回解題方**(`applyPuzzleMove`):產品的 `applyMove` 會把回合交給對手,
+   而 `getLegalMovesForPiece` 檢查「這顆子屬於當前玩家」⇒ 單人題**第二步就一顆都動不了**。
+   刻意不改 `game.ts`(對局那條路是對的)。
+3. **進度要從 state 算,不要每次讀 localStorage**:進度得跟著「剛解完」立刻更新,
+   而 localStorage 是外部可變狀態、React 看不到它的寫入 ⇒ state 當唯一真相、
+   localStorage 只做持久化(這樣依賴關係全是真的,不必用 eslint-disable 騙 lint)。
+
+**⚠ 兩個測試自己的坑**:
+- 提示文案**不要寫顏色與「上/下」方位**:方位是 renderer 的事,寫死了換視角就變錯的指引
+  (首版寫「把藍色棋子走進上面的紅色營區」,顏色與方位兩件都說錯,冒煙當場抓到)。
+- 冒煙的解法**先用引擎 BFS 在 node 算好再餵真點擊**:第一版在瀏覽器裡自己寫貪心導航,
+  2 步的題走了 30 步還沒解——那在驗「我的貪心夠不夠聰明」,不是在驗 UI 接線。
 
 ### ⚠️ 已知技術債
 - 約 **6 個既有 lint 錯誤**（`set-state-in-effect` / `no-explicit-any`）在 `ChineseCheckersBoard.tsx`、
