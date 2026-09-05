@@ -2,6 +2,7 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  ignore = "exit 0"   # 0905 止血(skill netlify-autobuild-stop):Git 觸發的雲端 build 一律取消;正版在 CF Pages(chinese-checker.pages.dev)
 
 [build.environment]
   # Vite 7 requires Node >= 20.19 / 22.12; pin a safe LTS.

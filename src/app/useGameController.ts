@@ -114,6 +114,16 @@ export function useGameController() {
     }
   }, [game.lastMove, game.winnerId])
 
+  // 📡 完賽 beacon:一局分出結果(有人贏 / 和局)= 一次 -done。打點函式住在 index.html(本機 dev 沒帶時安靜跳過);統計是配菜,失敗靜默。
+  useEffect(() => {
+    if (!game.winnerId && !game.isDraw) return
+    try {
+      ;(window as unknown as { psDone?: () => void }).psDone?.()
+    } catch {
+      /* 統計失敗不影響遊戲 */
+    }
+  }, [game.winnerId, game.isDraw])
+
   useEffect(() => {
     saveGameState(game)
   }, [game])
