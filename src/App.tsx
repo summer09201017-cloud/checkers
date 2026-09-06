@@ -258,6 +258,16 @@ function App() {
     })
   }, [dailyPuzzle, game, startDaily])
 
+  /* 🔗 ?daily 深連結(0906,信友火花「今日挑戰」卡直達):等於代按「📅 每日殘局」——只在開站那一刻看一次網址。 */
+  useEffect(() => {
+    try {
+      if (new URLSearchParams(window.location.search).has('daily')) startDaily()
+    } catch {
+      /* 網址解析失敗就當沒帶 */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   /* 📅 每日殘局(跳棋・D 型)。桌機側欄與手機設定頁共用同一段 JSX。
      ★ 解完了才出現「下一題」——沒解完給那顆會讓孩子以為可以跳過。 */
   const dailySection = (
@@ -316,11 +326,9 @@ function App() {
   const verTagSection = (
     <section className="panel-section">
       <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.7, margin: 0 }}>
-        版本 v2(2026-08-31)・📅 新增「每日殘局」:每天一組 <b>5 題</b>、全世界同一組——
-        在最少步數內把幾顆棋子全部走進對面營區;<b>每一題的最少步數都由電腦窮舉算過</b>,
-        每題分開記成績,明天換新的一組。
+        版本 v3(2026-09-06)・🔗 <b>網址加 ?daily 直接開每日殘局</b>(信友火花「今日挑戰」卡點了就進今天的題,不用再按每日鈕)。
         <br />
-        前幾版:v1 中國跳棋(對 AI 三檔/悔棋/棋譜回放/盤面編輯器/可分享連結/PWA)
+        前幾版:v2 📅 每日殘局:每天一組 5 題、全世界同一組,最少步數內把棋子全走進對面營區,每題的最少步數都由電腦窮舉算過(2026-08-31)・v1 中國跳棋(對 AI 三檔/悔棋/棋譜回放/盤面編輯器/可分享連結/PWA)
       </p>
     </section>
   )
